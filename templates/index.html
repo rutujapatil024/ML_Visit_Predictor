@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Should I Visit? — Indian Landmark Crowd Predictor</title>
+    <meta name="description"
+        content="Crowd prediction for 8 iconic Indian landmarks. Get visit recommendations, weather forecasts, and better date suggestions.">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Lato:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/index.css">
+</head>
+
+<body>
+    <!-- HERO -->
+    <section class="hero">
+        <div class="mandala"><svg viewBox="0 0 200 200">
+                <circle cx="100" cy="100" r="90" stroke="#D4A017" stroke-width="0.5" fill="none" />
+                <circle cx="100" cy="100" r="70" stroke="#D4A017" stroke-width="0.3" fill="none" />
+                <circle cx="100" cy="100" r="50" stroke="#D4A017" stroke-width="0.3" fill="none" />
+                <circle cx="100" cy="100" r="30" stroke="#D4A017" stroke-width="0.3" fill="none" />
+                <g stroke="#D4A017" stroke-width="0.3" fill="none">
+                    <line x1="100" y1="10" x2="100" y2="190" />
+                    <line x1="10" y1="100" x2="190" y2="100" />
+                    <line x1="27" y1="27" x2="173" y2="173" />
+                    <line x1="173" y1="27" x2="27" y2="173" />
+                    <line x1="100" y1="10" x2="163" y2="55" />
+                    <line x1="100" y1="10" x2="37" y2="55" />
+                    <line x1="100" y1="190" x2="163" y2="145" />
+                    <line x1="100" y1="190" x2="37" y2="145" />
+                    <line x1="10" y1="100" x2="55" y2="37" />
+                    <line x1="10" y1="100" x2="55" y2="163" />
+                    <line x1="190" y1="100" x2="145" y2="37" />
+                    <line x1="190" y1="100" x2="145" y2="163" />
+                </g>
+                <polygon points="100,10 163,55 163,145 100,190 37,145 37,55" stroke="#D4A017" stroke-width="0.4"
+                    fill="none" />
+            </svg></div>
+        <h1>Should I Visit?</h1>
+        <p>Crowd Prediction for Indian Landmarks</p>
+    </section>
+
+    <!-- INPUT -->
+    <section class="input-section">
+        <div class="input-card" id="inputCard">
+            <label for="placeSelect">Choose Your Destination</label>
+            <select id="placeSelect">
+                <option value="" disabled selected>Select a landmark...</option>
+                {% for place in places %}
+                <option value="{{ place }}">{{ place }}</option>
+                {% endfor %}
+            </select>
+            <div class="field-error" id="placeError">Please select a destination</div>
+            <label for="dateInput">Select Visit Date</label>
+            <input type="date" id="dateInput">
+            <div class="field-error" id="dateError">Please select a future date</div>
+            <button class="predict-btn" id="predictBtn" onclick="handlePredict()">
+                <span class="btn-text">Predict My Visit</span>
+                <span class="spinner"></span>
+            </button>
+        </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="results-section" id="resultsSection">
+        <div class="verdict-card" id="verdictCard">
+            <div class="verdict-emoji" id="verdictEmoji"></div>
+            <div class="verdict-text" id="verdictText"></div>
+            <div class="verdict-sub" id="verdictSub"></div>
+            <div class="score-ring"><svg viewBox="0 0 160 160">
+                    <circle class="bg" cx="80" cy="80" r="68" />
+                    <circle class="fill" id="scoreFill" cx="80" cy="80" r="68" />
+                </svg>
+                <div class="score-value" id="scoreValue">0</div>
+            </div>
+            <div class="score-label">Visit Score</div>
+            <div class="place-date-display" id="placeDate"></div>
+        </div>
+        <div class="details-grid" id="detailsGrid">
+            <div class="detail-card">
+                <div class="detail-icon">👥</div>
+                <div class="detail-title">Expected Crowd</div>
+                <div class="detail-value" id="crowdBadge"></div>
+                <div class="detail-sub" id="crowdCount"></div>
+            </div>
+            <div class="detail-card">
+                <div class="detail-icon" id="weatherIcon">☀️</div>
+                <div class="detail-title">Expected Weather</div>
+                <div class="detail-value" id="weatherValue"></div>
+                <div class="detail-sub">
+                    <div class="temp-bar">
+                        <div class="temp-bar-fill" id="tempBar"></div>
+                    </div>
+                    <div id="tempText" style="margin-top:6px"></div>
+                </div>
+            </div>
+            <div class="detail-card">
+                <div class="detail-icon">📅</div>
+                <div class="detail-title">Day Details</div>
+                <div class="detail-value" id="dayValue"></div>
+                <div class="detail-sub" id="holidayInfo"></div>
+            </div>
+            <div class="detail-card">
+                <div class="detail-icon">🎯</div>
+                <div class="detail-title">Visit Score</div>
+                <div class="detail-value" id="scoreText"></div>
+                <div class="detail-sub" id="scoreAdvice"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- BETTER DATES -->
+    <section class="better-section" id="betterSection">
+        <h2>Better Days to Visit</h2>
+        <p class="better-sub">Based on AI prediction for the next 60 days</p>
+        <div class="better-grid" id="betterGrid"></div>
+    </section>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <footer>
+        <p>Built with real crowd data from Indian landmarks</p>
+    </footer>
+
+    <script>
+        /* Set min date to today */
+        (function () { const d = document.getElementById('dateInput'); const t = new Date(); const y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0'), day = String(t.getDate()).padStart(2, '0'); d.min = `${y}-${m}-${day}`; const mx = new Date(t); mx.setFullYear(mx.getFullYear() + 1); d.max = `${mx.getFullYear()}-${String(mx.getMonth() + 1).padStart(2, '0')}-${String(mx.getDate()).padStart(2, '0')}` })();
+
+        /* Show toast notification */
+        function showToast(msg, type) { const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast ' + type; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 4000) }
+
+        /* Weather icon mapper */
+        function weatherIcon(w) { const m = { 'Sunny': '☀️', 'Clear': '🌤️', 'Cloudy': '⛅', 'Rainy': '🌧️' }; return m[w] || '🌤️' }
+
+        /* Crowd badge class mapper */
+        function crowdClass(l) { return 'badge badge-' + l.toLowerCase() }
+
+        /* Format date nicely */
+        function fmtDate(ds) { const d = new Date(ds + 'T00:00:00'); return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }) }
+
+        /* Animate score ring */
+        function animateScore(score) { const circ = document.getElementById('scoreFill'); const r = 68, c = 2 * Math.PI * r; circ.style.strokeDasharray = c; circ.style.strokeDashoffset = c; const color = score >= 70 ? '#4CAF50' : score >= 40 ? '#FF9800' : '#F44336'; circ.style.stroke = color; document.getElementById('scoreValue').style.color = color; setTimeout(() => { circ.style.strokeDashoffset = c - (score / 100) * c }, 50); let cur = 0; const end = score; const step = () => { cur += Math.ceil((end - cur) / 15) || 1; if (cur > end) cur = end; document.getElementById('scoreValue').textContent = cur; if (cur < end) requestAnimationFrame(step) }; step() }
+
+        /* Get score advice text */
+        function scoreAdvice(s) { if (s >= 85) return 'Perfect day for sightseeing!'; if (s >= 70) return 'Great conditions expected'; if (s >= 55) return 'Expect moderate crowds'; if (s >= 40) return 'Could be busy, plan ahead'; if (s >= 25) return 'Heavy crowds expected'; return 'Not recommended today' }
+
+        /* Temperature bar color */
+        function tempColor(t) { if (t <= 24) return '#42A5F5'; if (t <= 30) return '#66BB6A'; if (t <= 35) return '#FFA726'; return '#EF5350' }
+
+        /* Main prediction handler */
+        function handlePredict() {
+            const place = document.getElementById('placeSelect').value;
+            const date = document.getElementById('dateInput').value;
+            const pe = document.getElementById('placeError');
+            const de = document.getElementById('dateError');
+            let valid = true;
+            pe.style.display = 'none'; de.style.display = 'none';
+            if (!place) { pe.style.display = 'block'; valid = false }
+            if (!date) { de.style.display = 'block'; de.textContent = 'Please select a date'; valid = false }
+            else { const sel = new Date(date + 'T00:00:00'), now = new Date(); now.setHours(0, 0, 0, 0); if (sel < now) { de.style.display = 'block'; de.textContent = 'Please select a future date'; valid = false } }
+            if (!valid) return;
+            const btn = document.getElementById('predictBtn');
+            btn.classList.add('loading'); btn.disabled = true;
+            fetch('/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ place, date }) })
+                .then(r => r.json()).then(d => {
+                    btn.classList.remove('loading'); btn.disabled = false;
+                    if (d.error) { showToast(d.error, 'error'); return }
+                    renderResults(d, place, date)
+                }).catch(() => { btn.classList.remove('loading'); btn.disabled = false; showToast('Something went wrong. Please try again.', 'error') })
+        }
+
+        /* Render all results */
+        function renderResults(d, place, date) {
+            const rs = document.getElementById('resultsSection');
+            const vc = document.getElementById('verdictCard');
+            vc.className = 'verdict-card';
+            if (d.recommendation === 'YES') { vc.classList.add('yes'); document.getElementById('verdictEmoji').textContent = '✅'; document.getElementById('verdictText').textContent = 'YES — Great Day to Visit!'; document.getElementById('verdictSub').textContent = 'Low crowds and favorable conditions expected' }
+            else if (d.recommendation === 'MAYBE') { vc.classList.add('maybe'); document.getElementById('verdictEmoji').textContent = '⚠️'; document.getElementById('verdictText').textContent = 'MAYBE — Manageable but Busy'; document.getElementById('verdictSub').textContent = 'Expect some crowds, but still doable' }
+            else { vc.classList.add('no'); document.getElementById('verdictEmoji').textContent = '❌'; document.getElementById('verdictText').textContent = 'NO — Avoid This Day'; document.getElementById('verdictSub').textContent = 'Very high crowds or poor conditions expected' }
+            document.getElementById('placeDate').innerHTML = '<strong>' + place + '</strong> · ' + fmtDate(date);
+            animateScore(d.visit_score);
+            /* Crowd */
+            document.getElementById('crowdBadge').innerHTML = '<span class="' + crowdClass(d.crowd_level) + '">' + d.crowd_level + '</span>';
+            document.getElementById('crowdCount').textContent = 'Est. ' + d.crowd_count_est + ' visitors';
+            /* Weather */
+            document.getElementById('weatherIcon').textContent = weatherIcon(d.weather);
+            document.getElementById('weatherValue').textContent = d.weather;
+            const tb = document.getElementById('tempBar');
+            tb.style.width = Math.min(100, ((d.temperature - 15) / 30) * 100) + '%';
+            tb.style.background = tempColor(d.temperature);
+            document.getElementById('tempText').textContent = d.temperature + '°C';
+            /* Day */
+            document.getElementById('dayValue').textContent = d.day_of_week;
+            document.getElementById('holidayInfo').textContent = d.holiday_info + (d.event_type !== 'Regular Day' ? ' · ' + d.event_type : '');
+            /* Score card */
+            document.getElementById('scoreText').textContent = d.visit_score + ' / 100';
+            document.getElementById('scoreText').style.color = d.visit_score >= 70 ? 'var(--green)' : d.visit_score >= 40 ? 'var(--warn)' : 'var(--red)';
+            document.getElementById('scoreAdvice').textContent = scoreAdvice(d.visit_score);
+            rs.classList.add('visible');
+            rs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            /* Better dates */
+            const bs = document.getElementById('betterSection');
+            const bg = document.getElementById('betterGrid');
+            if (d.better_dates && d.better_dates.length > 0) {
+                bg.innerHTML = '';
+                d.better_dates.forEach(b => {
+                    const card = document.createElement('div'); card.className = 'better-card';
+                    card.innerHTML = `<div class="better-date">${fmtDate(b.date)}</div><div class="better-info"><span><span class="${crowdClass(b.crowd_level)}">${b.crowd_level}</span></span><span>${weatherIcon(b.weather)} ${b.weather} · ${b.temperature}°C</span><span>🎯 Score: ${b.visit_score}/100</span><span style="color:var(--muted);font-size:0.8rem">${b.holiday_info}</span></div><button class="plan-btn" onclick="planVisit('${b.date}')">Plan This Visit</button>`;
+                    bg.appendChild(card)
+                });
+                bs.classList.add('visible')
+            } else { bs.classList.remove('visible') }
+        }
+
+        /* Plan visit from better date card */
+        function planVisit(date) {
+            document.getElementById('dateInput').value = date;
+            document.getElementById('inputCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(handlePredict, 300)
+        }
+    </script>
+</body>
+
+</html>
