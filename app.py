@@ -236,6 +236,34 @@ def get_day_of_week_string(date_obj):
     """Return the day of week as a string (Monday, Tuesday, etc.)."""
     return date_obj.strftime("%A")
 
+def generate_tips(temperature, weather, crowd_level):
+    """Generate contextual travel tips based on temperature, weather, and crowd levels."""
+    tips = []
+    # Temperature tips
+    if temperature >= 38:
+        tips.append("⚠️ Extreme Heat: High temperature of " + str(temperature) + "°C expected. Limit outdoor exposure between 12 PM - 4 PM. Wear a hat, sunglasses, and carry hydration.")
+    elif temperature >= 33:
+        tips.append("☀️ Warm Day: Wear lightweight clothing, sunglasses, and sunscreen. Keep a water bottle handy.")
+    elif temperature <= 16:
+        tips.append("❄️ Cool Day: Temperatures are cool (around " + str(temperature) + "°C). Layered clothing or a light jacket is recommended for early morning and evening.")
+
+    # Weather tips
+    if weather == "Rainy":
+        tips.append("🌧️ Rain Forecast: Bring an umbrella or raincoat. Outdoor stone steps and paths may be slippery.")
+    elif weather == "Sunny":
+        tips.append("🕶️ UV Protection: Sunny sky expected. Sunscreen and a hat are highly recommended.")
+    elif weather == "Cloudy":
+        tips.append("📸 Photography Tip: Overcast skies offer beautifully soft, even lighting—perfect for clear photos without harsh shadows.")
+
+    # Crowd tips
+    if crowd_level in ["High", "Extreme"]:
+        tips.append("🎟️ Ticket Booking: Book entry tickets online in advance to skip the long physical ticketing lines.")
+        tips.append("⏰ Early Arrival: Arrive early in the morning (before 8 AM) to beat the crowds and queues.")
+    elif crowd_level == "Low":
+        tips.append("✨ Peaceful Visit: Excellent day to explore at a relaxed pace with minimal wait times.")
+
+    return tips
+
 
 def predict_for_date(place, date_str):
     """Run full prediction pipeline for a given place and date string."""
@@ -329,6 +357,9 @@ def predict_for_date(place, date_str):
     # Crowd count estimate
     crowd_count_est = CROWD_COUNT_RANGES.get(crowd_level, "Unknown")
 
+    # Generate travel tips
+    tips = generate_tips(temperature, weather, crowd_level)
+
     return {
         "crowd_level": crowd_level,
         "crowd_count_est": crowd_count_est,
@@ -340,6 +371,7 @@ def predict_for_date(place, date_str):
         "event_type": event_type,
         "day_of_week": day_of_week,
         "date": date_str,
+        "tips": tips,
     }
 
 
@@ -433,6 +465,55 @@ def predict():
 
     except Exception as e:
         print(f"  ❌ Prediction error: {e}")
+        return jsonify({"error": "Something went wrong. Please try again."}), 500
+
+
+@app.route("/compare", methods=["POST"])
+def compare():
+    """Handle comparison requests. Receives JSON with list of places and date."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data received. Please send JSON."}), 400
+
+        places = data.get("places", [])
+        date_str = data.get("date", "").strip()
+
+        # Validate inputs
+        if not places or not isinstance(places, list):
+            return jsonify({"error": "Please select landmarks to compare."}), 400
+        if len(places) < 2 or len(places) > 3:
+            return jsonify({"error": "Please select 2 or 3 landmarks."}), 400
+        if not date_str:
+            return jsonify({"error": "Please select a date."}), 400
+
+        # Validate date format
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
+
+        results = []
+        for place in places:
+            place = place.strip()
+            if place not in PLACES:
+                return jsonify({"error": f"Unknown destination: {place}"}), 400
+
+            res = predict_for_date(place, date_str)
+            if "error" in res:
+                return jsonify(res), 400
+            res["place"] = place
+            results.append(res)
+
+        # Sort results by visit_score descending
+        results.sort(key=lambda x: -x["visit_score"])
+        for idx, res in enumerate(results):
+            res["is_best"] = (idx == 0)
+
+        return jsonify(results)
+
+    except Exception as e:
+        print(f"  ❌ Comparison error: {e}")
         return jsonify({"error": "Something went wrong. Please try again."}), 500
 
 

@@ -83,3 +83,281 @@ footer p{color:var(--muted);font-size:0.9rem}
 .input-card{padding:24px}
 .verdict-card{padding:28px 16px}
 }
+
+/* TABS CONTAINER AND BUTTONS */
+.tabs-container {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+}
+.tab-btn {
+    padding: 10px 20px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--muted);
+    font-family: 'Cinzel', serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.3s;
+    letter-spacing: 0.5px;
+}
+.tab-btn:hover {
+    color: var(--gold);
+    background: rgba(212,160,23,0.05);
+}
+.tab-btn.active {
+    color: #0F0A00;
+    background: var(--gold);
+    border-color: var(--gold);
+}
+
+/* PLACES SELECTION GRID FOR COMPARE MODE */
+.compare-instruction {
+    font-family: 'Cinzel', serif;
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: -10px;
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+.places-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.place-checkbox {
+    display: none;
+}
+.place-chip {
+    display: block;
+    padding: 12px;
+    background: #0F0A00;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--cream);
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    user-select: none;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.place-chip:hover {
+    border-color: var(--gold);
+    background: rgba(212,160,23,0.02);
+}
+.place-checkbox:checked + .place-chip {
+    border-color: var(--gold);
+    background: rgba(212,160,23,0.12);
+    color: var(--gold);
+    box-shadow: 0 0 12px rgba(212,160,23,0.15);
+    font-weight: 700;
+}
+
+/* WIDE TRAVEL TIPS CARD */
+.tips-wide-card {
+    grid-column: span 2;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 10px;
+    text-align: left;
+}
+.tips-wide-card h3 {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+}
+.tips-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.tips-list li {
+    font-size: 0.95rem;
+    color: var(--cream);
+    line-height: 1.5;
+    padding-left: 12px;
+    border-left: 2px solid var(--gold);
+}
+
+/* COMPARE RESULTS SECTION */
+.compare-results-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+    display: none;
+}
+.compare-results-section.visible {
+    display: block;
+    animation: fadeUp 0.6s ease;
+}
+.compare-results-section h2 {
+    text-align: center;
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+}
+.compare-results-sub {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 30px;
+    font-size: 1rem;
+}
+.compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+.compare-column {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 30px 24px;
+    text-align: center;
+    position: relative;
+    transition: transform 0.3s, border-color 0.3s;
+}
+.compare-column:hover {
+    transform: translateY(-5px);
+}
+.compare-column.best-choice {
+    border-color: var(--gold);
+    box-shadow: 0 10px 30px rgba(212,160,23,0.1);
+}
+.best-badge {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--gold), var(--orange));
+    color: #0F0A00;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.compare-dest-name {
+    font-family: 'Cinzel', serif;
+    font-size: 1.3rem;
+    color: var(--gold);
+    margin-top: 10px;
+    margin-bottom: 16px;
+}
+.compare-verdict-badge {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+}
+.compare-verdict-badge.yes {
+    background: var(--yes-bg);
+    color: var(--green);
+    border: 1px solid #1a4d2a;
+}
+.compare-verdict-badge.maybe {
+    background: var(--maybe-bg);
+    color: var(--warn);
+    border: 1px solid #4d3a1a;
+}
+.compare-verdict-badge.no {
+    background: var(--no-bg);
+    color: var(--red);
+    border: 1px solid #4d1a1a;
+}
+.compare-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+}
+.compare-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: left;
+}
+.compare-metric-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+.compare-metric-icon {
+    font-size: 1.4rem;
+}
+.compare-metric-info {
+    display: flex;
+    flex-direction: column;
+}
+.compare-metric-title {
+    font-family: 'Cinzel', serif;
+    color: var(--muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.compare-metric-val {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--cream);
+}
+.compare-metric-sub {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+.compare-tips-card {
+    background: #0F0A00;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-top: 16px;
+    text-align: left;
+}
+.compare-tips-card h4 {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+}
+.compare-tips-card ul {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.compare-tips-card li {
+    font-size: 0.85rem;
+    color: var(--cream);
+    line-height: 1.4;
+    padding-left: 8px;
+    border-left: 1.5px solid var(--gold);
+}
+
+@media(max-width: 700px) {
+    .places-grid {
+        grid-template-columns: 1fr;
+    }
+    .tips-wide-card {
+        grid-column: span 1;
+    }
+}
