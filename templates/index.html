@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/static/index.css">
 </head>
 
+
 <body>
     <!-- HERO -->
     <section class="hero">
@@ -45,19 +46,47 @@
     <!-- INPUT -->
     <section class="input-section">
         <div class="input-card" id="inputCard">
-            <label for="placeSelect">Choose Your Destination</label>
-            <select id="placeSelect">
-                <option value="" disabled selected>Select a landmark...</option>
-                {% for place in places %}
-                <option value="{{ place }}">{{ place }}</option>
-                {% endfor %}
-            </select>
-            <div class="field-error" id="placeError">Please select a destination</div>
+            <!-- Tabs Interface -->
+            <div class="tabs-container">
+                <button class="tab-btn active" id="singleTab" onclick="switchTab('single')">Single Prediction</button>
+                <button class="tab-btn" id="compareTab" onclick="switchTab('compare')">Compare Landmarks</button>
+            </div>
+
+            <!-- Single Prediction Form -->
+            <div id="singleInputs">
+                <label for="placeSelect">Choose Your Destination</label>
+                <select id="placeSelect">
+                    <option value="" disabled selected>Select a landmark...</option>
+                    {% for place in places %}
+                    <option value="{{ place }}">{{ place }}</option>
+                    {% endfor %}
+                </select>
+                <div class="field-error" id="placeError">Please select a destination</div>
+            </div>
+
+            <!-- Compare Landmarks Form -->
+            <div id="compareInputs" style="display:none">
+                <label>Choose 2 or 3 Destinations to Compare</label>
+                <div class="compare-instruction">Select landmarks from the options below:</div>
+                <div class="places-grid">
+                    {% for place in places %}
+                    <label>
+                        <input type="checkbox" name="comparePlaces" value="{{ place }}" class="place-checkbox"
+                            onchange="handleCheckboxChange(this)">
+                        <span class="place-chip">{{ place.split(',')[0] }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="field-error" id="comparePlacesError">Please select exactly 2 or 3 destinations</div>
+            </div>
+
+            <!-- Common Date Selector and Submit -->
             <label for="dateInput">Select Visit Date</label>
             <input type="date" id="dateInput">
             <div class="field-error" id="dateError">Please select a future date</div>
-            <button class="predict-btn" id="predictBtn" onclick="handlePredict()">
-                <span class="btn-text">Predict My Visit</span>
+
+            <button class="predict-btn" id="predictBtn" onclick="handleSubmit()">
+                <span class="btn-text" id="predictBtnText">Predict My Visit</span>
                 <span class="spinner"></span>
             </button>
         </div>
@@ -108,7 +137,18 @@
                 <div class="detail-value" id="scoreText"></div>
                 <div class="detail-sub" id="scoreAdvice"></div>
             </div>
+            <div class="tips-wide-card" id="tipsCard" style="display:none">
+                <h3>📋 Travel Guide & Tips</h3>
+                <ul class="tips-list" id="tipsList"></ul>
+            </div>
         </div>
+    </section>
+
+    <!-- COMPARE RESULTS -->
+    <section class="compare-results-section" id="compareResultsSection">
+        <h2>Comparison Results</h2>
+        <p class="compare-results-sub" id="compareResultsSub"></p>
+        <div class="compare-grid" id="compareGrid"></div>
     </section>
 
     <!-- BETTER DATES -->
@@ -126,6 +166,8 @@
     </footer>
 
     <script>
+        let activeTab = 'single';
+
         /* Set min date to today */
         (function () { const d = document.getElementById('dateInput'); const t = new Date(); const y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0'), day = String(t.getDate()).padStart(2, '0'); d.min = `${y}-${m}-${day}`; const mx = new Date(t); mx.setFullYear(mx.getFullYear() + 1); d.max = `${mx.getFullYear()}-${String(mx.getMonth() + 1).padStart(2, '0')}-${String(mx.getDate()).padStart(2, '0')}` })();
 
@@ -150,6 +192,39 @@
         /* Temperature bar color */
         function tempColor(t) { if (t <= 24) return '#42A5F5'; if (t <= 30) return '#66BB6A'; if (t <= 35) return '#FFA726'; return '#EF5350' }
 
+        /* Tab switching */
+        function switchTab(mode) {
+            activeTab = mode;
+            document.getElementById('singleTab').className = 'tab-btn' + (mode === 'single' ? ' active' : '');
+            document.getElementById('compareTab').className = 'tab-btn' + (mode === 'compare' ? ' active' : '');
+            document.getElementById('singleInputs').style.display = mode === 'single' ? 'block' : 'none';
+            document.getElementById('compareInputs').style.display = mode === 'compare' ? 'block' : 'none';
+            document.getElementById('predictBtnText').textContent = mode === 'single' ? 'Predict My Visit' : 'Compare Landmarks';
+
+            // Clear errors
+            document.getElementById('placeError').style.display = 'none';
+            document.getElementById('comparePlacesError').style.display = 'none';
+            document.getElementById('dateError').style.display = 'none';
+        }
+
+        /* Checkbox handler - max 3 */
+        function handleCheckboxChange(cb) {
+            const checked = document.querySelectorAll('input[name="comparePlaces"]:checked');
+            if (checked.length > 3) {
+                cb.checked = false;
+                showToast("You can compare up to 3 landmarks at a time.", "error");
+            }
+        }
+
+        /* Central submission handler */
+        function handleSubmit() {
+            if (activeTab === 'single') {
+                handlePredict();
+            } else {
+                handleCompare();
+            }
+        }
+
         /* Main prediction handler */
         function handlePredict() {
             const place = document.getElementById('placeSelect').value;
@@ -172,8 +247,37 @@
                 }).catch(() => { btn.classList.remove('loading'); btn.disabled = false; showToast('Something went wrong. Please try again.', 'error') })
         }
 
+        /* Landmark compare handler */
+        function handleCompare() {
+            const checked = document.querySelectorAll('input[name="comparePlaces"]:checked');
+            const date = document.getElementById('dateInput').value;
+            const ce = document.getElementById('comparePlacesError');
+            const de = document.getElementById('dateError');
+            let valid = true;
+            ce.style.display = 'none'; de.style.display = 'none';
+
+            if (checked.length < 2 || checked.length > 3) { ce.style.display = 'block'; valid = false }
+            if (!date) { de.style.display = 'block'; de.textContent = 'Please select a date'; valid = false }
+            else { const sel = new Date(date + 'T00:00:00'), now = new Date(); now.setHours(0, 0, 0, 0); if (sel < now) { de.style.display = 'block'; de.textContent = 'Please select a future date'; valid = false } }
+            if (!valid) return;
+
+            const places = Array.from(checked).map(cb => cb.value);
+            const btn = document.getElementById('predictBtn');
+            btn.classList.add('loading'); btn.disabled = true;
+
+            fetch('/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ places, date }) })
+                .then(r => r.json()).then(d => {
+                    btn.classList.remove('loading'); btn.disabled = false;
+                    if (d.error) { showToast(d.error, 'error'); return }
+                    renderCompareResults(d, date)
+                }).catch(() => { btn.classList.remove('loading'); btn.disabled = false; showToast('Something went wrong. Please try again.', 'error') })
+        }
+
         /* Render all results */
         function renderResults(d, place, date) {
+            // Hide compare results
+            document.getElementById('compareResultsSection').classList.remove('visible');
+
             const rs = document.getElementById('resultsSection');
             const vc = document.getElementById('verdictCard');
             vc.className = 'verdict-card';
@@ -199,6 +303,21 @@
             document.getElementById('scoreText').textContent = d.visit_score + ' / 100';
             document.getElementById('scoreText').style.color = d.visit_score >= 70 ? 'var(--green)' : d.visit_score >= 40 ? 'var(--warn)' : 'var(--red)';
             document.getElementById('scoreAdvice').textContent = scoreAdvice(d.visit_score);
+
+            /* Render travel guide tips */
+            const tl = document.getElementById('tipsList');
+            tl.innerHTML = '';
+            if (d.tips && d.tips.length > 0) {
+                d.tips.forEach(t => {
+                    const li = document.createElement('li');
+                    li.textContent = t;
+                    tl.appendChild(li);
+                });
+                document.getElementById('tipsCard').style.display = 'block';
+            } else {
+                document.getElementById('tipsCard').style.display = 'none';
+            }
+
             rs.classList.add('visible');
             rs.scrollIntoView({ behavior: 'smooth', block: 'start' });
             /* Better dates */
@@ -213,6 +332,87 @@
                 });
                 bs.classList.add('visible')
             } else { bs.classList.remove('visible') }
+        }
+
+        /* Render comparison results */
+        function renderCompareResults(results, date) {
+            // Hide single results
+            document.getElementById('resultsSection').classList.remove('visible');
+            document.getElementById('betterSection').classList.remove('visible');
+
+            const crs = document.getElementById('compareResultsSection');
+            const cg = document.getElementById('compareGrid');
+            document.getElementById('compareResultsSub').innerHTML = 'Predictions for <strong>' + fmtDate(date) + '</strong>';
+            cg.innerHTML = '';
+
+            results.forEach(d => {
+                const col = document.createElement('div');
+                col.className = 'compare-column' + (d.is_best ? ' best-choice' : '');
+
+                const bestBadge = d.is_best ? '<div class="best-badge">★ Best Choice</div>' : '';
+                const rec = d.recommendation.toLowerCase();
+
+                let tipsHtml = '';
+                if (d.tips && d.tips.length > 0) {
+                    tipsHtml = `
+                        <div class="compare-tips-card">
+                            <h4>📋 Travel Tips</h4>
+                            <ul>
+                                ${d.tips.map(t => `<li>${t}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+
+                col.innerHTML = `
+                    ${bestBadge}
+                    <div class="compare-dest-name">${d.place.split(',')[0]}</div>
+                    <div class="compare-verdict-badge ${rec}">${d.recommendation} — ${d.recommendation === 'YES' ? 'Recommended' : d.recommendation === 'MAYBE' ? 'Busy' : 'Avoid'}</div>
+                    
+                    <div class="score-ring" style="width:110px; height:110px;">
+                        <svg viewBox="0 0 160 160">
+                            <circle class="bg" cx="80" cy="80" r="68" />
+                            <circle class="fill" cx="80" cy="80" r="68" stroke-dasharray="427.25" stroke-dashoffset="${427.25 - (d.visit_score / 100) * 427.25}" stroke="${d.visit_score >= 70 ? '#4CAF50' : d.visit_score >= 40 ? '#FF9800' : '#F44336'}" />
+                        </svg>
+                        <div class="score-value" style="font-size: 1.6rem; color: ${d.visit_score >= 70 ? '#4CAF50' : d.visit_score >= 40 ? '#FF9800' : '#F44336'}">${d.visit_score}</div>
+                    </div>
+                    
+                    <div class="compare-divider"></div>
+                    
+                    <div class="compare-metrics">
+                        <div class="compare-metric-item">
+                            <div class="compare-metric-icon">👥</div>
+                            <div class="compare-metric-info">
+                                <div class="compare-metric-title">Crowd Level</div>
+                                <div class="compare-metric-val"><span class="${crowdClass(d.crowd_level)}">${d.crowd_level}</span></div>
+                                <div class="compare-metric-sub">Est. ${d.crowd_count_est} visitors</div>
+                            </div>
+                        </div>
+                        
+                        <div class="compare-metric-item">
+                            <div class="compare-metric-icon">${weatherIcon(d.weather)}</div>
+                            <div class="compare-metric-info">
+                                <div class="compare-metric-title">Weather & Temp</div>
+                                <div class="compare-metric-val">${d.weather} · ${d.temperature}°C</div>
+                            </div>
+                        </div>
+                        
+                        <div class="compare-metric-item">
+                            <div class="compare-metric-icon">📅</div>
+                            <div class="compare-metric-info">
+                                <div class="compare-metric-title">Day Context</div>
+                                <div class="compare-metric-val" style="font-size:0.85rem">${d.holiday_info}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${tipsHtml}
+                `;
+                cg.appendChild(col);
+            });
+
+            crs.classList.add('visible');
+            crs.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         /* Plan visit from better date card */
