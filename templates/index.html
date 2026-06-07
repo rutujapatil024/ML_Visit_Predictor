@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/static/index.css">
 </head>
 
+
 <body>
     <!-- HERO -->
     <section class="hero">
@@ -70,7 +71,8 @@
                 <div class="places-grid">
                     {% for place in places %}
                     <label>
-                        <input type="checkbox" name="comparePlaces" value="{{ place }}" class="place-checkbox" onchange="handleCheckboxChange(this)">
+                        <input type="checkbox" name="comparePlaces" value="{{ place }}" class="place-checkbox"
+                            onchange="handleCheckboxChange(this)">
                         <span class="place-chip">{{ place.split(',')[0] }}</span>
                     </label>
                     {% endfor %}
@@ -198,7 +200,7 @@
             document.getElementById('singleInputs').style.display = mode === 'single' ? 'block' : 'none';
             document.getElementById('compareInputs').style.display = mode === 'compare' ? 'block' : 'none';
             document.getElementById('predictBtnText').textContent = mode === 'single' ? 'Predict My Visit' : 'Compare Landmarks';
-            
+
             // Clear errors
             document.getElementById('placeError').style.display = 'none';
             document.getElementById('comparePlacesError').style.display = 'none';
@@ -253,7 +255,7 @@
             const de = document.getElementById('dateError');
             let valid = true;
             ce.style.display = 'none'; de.style.display = 'none';
-            
+
             if (checked.length < 2 || checked.length > 3) { ce.style.display = 'block'; valid = false }
             if (!date) { de.style.display = 'block'; de.textContent = 'Please select a date'; valid = false }
             else { const sel = new Date(date + 'T00:00:00'), now = new Date(); now.setHours(0, 0, 0, 0); if (sel < now) { de.style.display = 'block'; de.textContent = 'Please select a future date'; valid = false } }
@@ -346,10 +348,10 @@
             results.forEach(d => {
                 const col = document.createElement('div');
                 col.className = 'compare-column' + (d.is_best ? ' best-choice' : '');
-                
+
                 const bestBadge = d.is_best ? '<div class="best-badge">★ Best Choice</div>' : '';
                 const rec = d.recommendation.toLowerCase();
-                
+
                 let tipsHtml = '';
                 if (d.tips && d.tips.length > 0) {
                     tipsHtml = `
