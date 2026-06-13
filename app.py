@@ -376,9 +376,9 @@ def predict_for_date(place, date_str):
 
 
 def find_better_dates(place, start_date_str):
-    """Scan next 60 days and return top 3 dates with Low or Moderate crowd."""
+    """Scan next 60 days and return top 3 dates with best visit scores."""
     start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-    better = []
+    all_dates = []
 
     for i in range(1, 61):
         check_date = start_date + timedelta(days=i)
@@ -388,23 +388,19 @@ def find_better_dates(place, start_date_str):
         if "error" in result:
             continue
 
-        if result["crowd_level"] in ["Low", "Moderate"]:
-            better.append({
-                "date": check_str,
-                "day_of_week": result["day_of_week"],
-                "crowd_level": result["crowd_level"],
-                "temperature": result["temperature"],
-                "weather": result["weather"],
-                "visit_score": result["visit_score"],
-                "holiday_info": result["holiday_info"],
-            })
-
-        if len(better) >= 3:
-            break
+        all_dates.append({
+            "date": check_str,
+            "day_of_week": result["day_of_week"],
+            "crowd_level": result["crowd_level"],
+            "temperature": result["temperature"],
+            "weather": result["weather"],
+            "visit_score": result["visit_score"],
+            "holiday_info": result["holiday_info"],
+        })
 
     # Sort by visit score descending and return top 3
-    better.sort(key=lambda x: -x["visit_score"])
-    return better[:3]
+    all_dates.sort(key=lambda x: -x["visit_score"])
+    return all_dates[:3]
 
 
 # ══════════════════════════════════════════════════════
@@ -455,11 +451,8 @@ def predict():
         if "error" in result:
             return jsonify(result), 400
 
-        # Find better dates if recommendation is NO or MAYBE
-        if result["recommendation"] in ["NO", "MAYBE"]:
-            result["better_dates"] = find_better_dates(place, date_str)
-        else:
-            result["better_dates"] = []
+        # Always find better dates for the selected place
+        result["better_dates"] = find_better_dates(place, date_str)
 
         return jsonify(result)
 

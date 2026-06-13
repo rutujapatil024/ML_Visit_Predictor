@@ -82,7 +82,10 @@
 
             <!-- Common Date Selector and Submit -->
             <label for="dateInput">Select Visit Date</label>
-            <input type="date" id="dateInput">
+            <div class="date-input-wrapper">
+                <input type="date" id="dateInput" onclick="this.showPicker && this.showPicker()">
+                <span class="calendar-icon" onclick="document.getElementById('dateInput').showPicker && document.getElementById('dateInput').showPicker()">📅</span>
+            </div>
             <div class="field-error" id="dateError">Please select a future date</div>
 
             <button class="predict-btn" id="predictBtn" onclick="handleSubmit()">
@@ -153,8 +156,8 @@
 
     <!-- BETTER DATES -->
     <section class="better-section" id="betterSection">
-        <h2>Better Days to Visit</h2>
-        <p class="better-sub">Based on AI prediction for the next 60 days</p>
+        <h2>Top 3 Better Dates to Visit</h2>
+        <p class="better-sub">Dates with the best visit scores in the next 60 days</p>
         <div class="better-grid" id="betterGrid"></div>
     </section>
 
@@ -205,6 +208,11 @@
             document.getElementById('placeError').style.display = 'none';
             document.getElementById('comparePlacesError').style.display = 'none';
             document.getElementById('dateError').style.display = 'none';
+
+            // Hide all results when switching tabs
+            document.getElementById('resultsSection').classList.remove('visible');
+            document.getElementById('compareResultsSection').classList.remove('visible');
+            document.getElementById('betterSection').classList.remove('visible');
         }
 
         /* Checkbox handler - max 3 */
@@ -325,9 +333,11 @@
             const bg = document.getElementById('betterGrid');
             if (d.better_dates && d.better_dates.length > 0) {
                 bg.innerHTML = '';
-                d.better_dates.forEach(b => {
-                    const card = document.createElement('div'); card.className = 'better-card';
-                    card.innerHTML = `<div class="better-date">${fmtDate(b.date)}</div><div class="better-info"><span><span class="${crowdClass(b.crowd_level)}">${b.crowd_level}</span></span><span>${weatherIcon(b.weather)} ${b.weather} · ${b.temperature}°C</span><span>🎯 Score: ${b.visit_score}/100</span><span style="color:var(--muted);font-size:0.8rem">${b.holiday_info}</span></div><button class="plan-btn" onclick="planVisit('${b.date}')">Plan This Visit</button>`;
+                d.better_dates.forEach((b, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'better-card' + (idx === 0 ? ' best-choice' : '');
+                    const bestBadge = idx === 0 ? '<div class="best-badge">★ Best Choice</div>' : '';
+                    card.innerHTML = `${bestBadge}<div class="better-date">${fmtDate(b.date)}</div><div class="better-info"><span><span class="${crowdClass(b.crowd_level)}">${b.crowd_level}</span></span><span>${weatherIcon(b.weather)} ${b.weather} · ${b.temperature}°C</span><span>🎯 Score: ${b.visit_score}/100</span><span style="color:var(--muted);font-size:0.8rem">${b.holiday_info}</span></div><button class="plan-btn" onclick="planVisit('${b.date}')">Plan This Visit</button>`;
                     bg.appendChild(card)
                 });
                 bs.classList.add('visible')
@@ -423,6 +433,14 @@
             document.getElementById('inputCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
             setTimeout(handlePredict, 300)
         }
+
+        /* Enter key to submit */
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSubmit();
+            }
+        });
     </script>
 </body>
 
