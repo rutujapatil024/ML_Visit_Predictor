@@ -11,9 +11,10 @@ import numpy as np
 import os
 import joblib
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score, classification_report, mean_absolute_error
+from sklearn.metrics import accuracy_score, classification_report, mean_absolute_error, r2_score
 
 # ══════════════════════════════════════════════════════
 # CONSTANTS
@@ -200,9 +201,9 @@ def build_weather_lookup(df):
 
 
 def train_crowd_model(df):
-    """Train RandomForestClassifier for crowd level prediction."""
+    """Train multiple classifiers for crowd level prediction."""
     print("\n" + "=" * 60)
-    print("STEP 6: Training Crowd Level Classifier...")
+    print("STEP 6: Training Crowd Level Classifiers...")
     print("=" * 60)
 
     X = df[FEATURE_COLS]
@@ -213,25 +214,47 @@ def train_crowd_model(df):
     )
     print(f"  Train set: {len(X_train)} rows | Test set: {len(X_test)} rows")
 
-    model = RandomForestClassifier(
+    # 1. Random Forest
+    rf_model = RandomForestClassifier(
         n_estimators=100, max_depth=10, random_state=42
     )
-    model.fit(X_train, y_train)
+    rf_model.fit(X_train, y_train)
+    rf_pred = rf_model.predict(X_test)
+    rf_acc = accuracy_score(y_test, rf_pred)
+    print(f"  ✓ Random Forest Classifier Accuracy: {rf_acc * 100:.1f}%")
 
-    y_pred = model.predict(X_test)
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"\n  ★ Crowd Model Accuracy: {accuracy * 100:.1f}%")
-    print(f"\n  Classification Report:")
-    print(classification_report(y_test, y_pred))
+    # 2. Decision Tree
+    dt_model = DecisionTreeClassifier(
+        max_depth=10, random_state=42
+    )
+    dt_model.fit(X_train, y_train)
+    dt_pred = dt_model.predict(X_test)
+    dt_acc = accuracy_score(y_test, dt_pred)
+    print(f"  ✓ Decision Tree Classifier Accuracy: {dt_acc * 100:.1f}%")
 
-    # Feature importances
-    importances = dict(zip(FEATURE_COLS, model.feature_importances_))
-    print("  Feature Importances:")
+    # 3. Gradient Boosting
+    gb_model = GradientBoostingClassifier(
+        n_estimators=50, max_depth=5, random_state=42
+    )
+    gb_model.fit(X_train, y_train)
+    gb_pred = gb_model.predict(X_test)
+    gb_acc = accuracy_score(y_test, gb_pred)
+    print(f"  ✓ Gradient Boosting Classifier Accuracy: {gb_acc * 100:.1f}%")
+
+    # Feature importances for RF (primary model)
+    importances = dict(zip(FEATURE_COLS, rf_model.feature_importances_))
+    print("\n  RF Feature Importances:")
     for feat, imp in sorted(importances.items(), key=lambda x: -x[1]):
         bar = "█" * int(imp * 50)
         print(f"    {feat:18s} {imp:.4f} {bar}")
 
-    return model, importances
+    metrics = {
+        "Random Forest": {"accuracy": round(rf_acc, 4)},
+        "Decision Tree": {"accuracy": round(dt_acc, 4)},
+        "Gradient Boosting": {"accuracy": round(gb_acc, 4)}
+    }
+
+    return rf_model, dt_model, gb_model, importances, metrics
 
 
 def train_temp_model(df):
@@ -260,28 +283,108 @@ def train_temp_model(df):
     return model
 
 
-def save_models(crowd_model, temp_model, encoders, weather_lookup, importances):
-    """Save all models, encoders, and lookup tables to the models/ directory."""
+def train_crowd_count_model(df):
+    """Train multiple regressors for raw crowd count prediction."""
+    print("\n" + "=" * 60)
+    print("STEP 7B: Training Crowd Count Regressors...")
+    print("=" * 60)
+
+    X = df[FEATURE_COLS]
+    y = df["Crowd_Count (in Thousands)"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+    print(f"  Train set: {len(X_train)} rows | Test set: {len(X_test)} rows")
+
+    # 1. Random Forest
+    rf_model = RandomForestRegressor(
+        n_estimators=150, max_depth=12, random_state=42
+    )
+    rf_model.fit(X_train, y_train)
+    rf_pred = rf_model.predict(X_test)
+    rf_mae = mean_absolute_error(y_test, rf_pred)
+    rf_r2 = r2_score(y_test, rf_pred)
+    print(f"  ✓ Random Forest Regressor - MAE: {rf_mae:.0f} visitors | R2: {rf_r2:.3f}")
+
+    # 2. Decision Tree
+    dt_model = DecisionTreeRegressor(
+        max_depth=12, random_state=42
+    )
+    dt_model.fit(X_train, y_train)
+    dt_pred = dt_model.predict(X_test)
+    dt_mae = mean_absolute_error(y_test, dt_pred)
+    dt_r2 = r2_score(y_test, dt_pred)
+    print(f"  ✓ Decision Tree Regressor - MAE: {dt_mae:.0f} visitors | R2: {dt_r2:.3f}")
+
+    # 3. Gradient Boosting
+    gb_model = GradientBoostingRegressor(
+        n_estimators=50, max_depth=5, random_state=42
+    )
+    gb_model.fit(X_train, y_train)
+    gb_pred = gb_model.predict(X_test)
+    gb_mae = mean_absolute_error(y_test, gb_pred)
+    gb_r2 = r2_score(y_test, gb_pred)
+    print(f"  ✓ Gradient Boosting Regressor - MAE: {gb_mae:.0f} visitors | R2: {gb_r2:.3f}")
+
+    # Show sample RF predictions vs actual
+    print("\n  Sample Predictions vs Actual (Random Forest):")
+    for i in range(min(5, len(y_test))):
+        actual = y_test.iloc[i]
+        predicted = int(round(rf_pred[i]))
+        print(f"    Actual: {actual:,} | Predicted: {predicted:,}")
+
+    metrics = {
+        "Random Forest": {"mae": round(float(rf_mae), 2), "r2": round(float(rf_r2), 4)},
+        "Decision Tree": {"mae": round(float(dt_mae), 2), "r2": round(float(dt_r2), 4)},
+        "Gradient Boosting": {"mae": round(float(gb_mae), 2), "r2": round(float(gb_r2), 4)}
+    }
+
+    return rf_model, dt_model, gb_model, metrics
+
+
+def save_models(
+    rf_crowd, dt_crowd, gb_crowd,
+    temp_model,
+    rf_cc, dt_cc, gb_cc,
+    encoders, weather_lookup, importances,
+    metrics
+):
+    """Save all models, encoders, lookup tables, and model metrics."""
     print("\n" + "=" * 60)
     print("STEP 8: Saving models...")
     print("=" * 60)
 
     os.makedirs(MODEL_DIR, exist_ok=True)
 
-    joblib.dump(crowd_model, os.path.join(MODEL_DIR, "crowd_model.pkl"))
-    print(f"  ✓ Saved crowd_model.pkl")
+    # Dump classifier models
+    joblib.dump(rf_crowd, os.path.join(MODEL_DIR, "crowd_model.pkl"))
+    joblib.dump(dt_crowd, os.path.join(MODEL_DIR, "dt_crowd_model.pkl"))
+    joblib.dump(gb_crowd, os.path.join(MODEL_DIR, "gb_crowd_model.pkl"))
+    print("  ✓ Saved crowd level classification models (RF, DT, GB)")
 
+    # Dump temperature model
     joblib.dump(temp_model, os.path.join(MODEL_DIR, "temp_model.pkl"))
-    print(f"  ✓ Saved temp_model.pkl")
+    print("  ✓ Saved temp_model.pkl")
 
+    # Dump regressor models (crowd count)
+    joblib.dump(rf_cc, os.path.join(MODEL_DIR, "crowd_count_model.pkl"))
+    joblib.dump(dt_cc, os.path.join(MODEL_DIR, "dt_crowd_count_model.pkl"))
+    joblib.dump(gb_cc, os.path.join(MODEL_DIR, "gb_crowd_count_model.pkl"))
+    print("  ✓ Saved crowd count regression models (RF, DT, GB)")
+
+    # Save remaining utilities
     joblib.dump(encoders, os.path.join(MODEL_DIR, "encoders.pkl"))
-    print(f"  ✓ Saved encoders.pkl")
-
     joblib.dump(weather_lookup, os.path.join(MODEL_DIR, "weather_lookup.pkl"))
-    print(f"  ✓ Saved weather_lookup.pkl")
-
     joblib.dump(importances, os.path.join(MODEL_DIR, "feature_importance.pkl"))
-    print(f"  ✓ Saved feature_importance.pkl")
+    print("  ✓ Saved encoders, weather lookup, and feature importance")
+
+    # Save metrics JSON
+    import json
+    metrics_path = os.path.join(MODEL_DIR, "model_metrics.json")
+    with open(metrics_path, "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2)
+    print("  ✓ Saved model_metrics.json")
 
 
 def main():
@@ -308,14 +411,29 @@ def main():
     # Weather lookup (no ML — just mode per Place+Month)
     weather_lookup = build_weather_lookup(df)
 
-    # Train crowd classifier
-    crowd_model, importances = train_crowd_model(df)
+    # Train crowd classifiers
+    rf_crowd, dt_crowd, gb_crowd, importances, class_metrics = train_crowd_model(df)
 
     # Train temperature regressor
     temp_model = train_temp_model(df)
 
+    # Train crowd count regressors
+    rf_cc, dt_cc, gb_cc, reg_metrics = train_crowd_count_model(df)
+
+    # Combine metrics
+    metrics = {
+        "classification": class_metrics,
+        "regression": reg_metrics
+    }
+
     # Save everything
-    save_models(crowd_model, temp_model, encoders, weather_lookup, importances)
+    save_models(
+        rf_crowd, dt_crowd, gb_crowd,
+        temp_model,
+        rf_cc, dt_cc, gb_cc,
+        encoders, weather_lookup, importances,
+        metrics
+    )
 
     print("\n" + "╔" + "═" * 58 + "╗")
     print("║" + " ✅ All models saved successfully! ".center(58) + "║")

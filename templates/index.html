@@ -6,11 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Should I Visit? — Indian Landmark Crowd Predictor</title>
     <meta name="description"
-        content="Crowd prediction for 8 iconic Indian landmarks. Get visit recommendations, weather forecasts, and better date suggestions.">
+        content="ML-powered crowd prediction for 8 iconic Indian landmarks. Get visit recommendations, live weather forecasts, crowd trend charts, and better date suggestions.">
     <link
         href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Lato:wght@300;400;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/static/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 
 
@@ -116,11 +117,13 @@
                 <div class="detail-title">Expected Crowd</div>
                 <div class="detail-value" id="crowdBadge"></div>
                 <div class="detail-sub" id="crowdCount"></div>
+                <div class="detail-sub crowd-predicted" id="crowdPredicted"></div>
             </div>
             <div class="detail-card">
                 <div class="detail-icon" id="weatherIcon">☀️</div>
                 <div class="detail-title">Expected Weather</div>
                 <div class="detail-value" id="weatherValue"></div>
+                <div class="weather-source-badge" id="weatherSourceBadge"></div>
                 <div class="detail-sub">
                     <div class="temp-bar">
                         <div class="temp-bar-fill" id="tempBar"></div>
@@ -143,6 +146,144 @@
             <div class="tips-wide-card" id="tipsCard" style="display:none">
                 <h3>📋 Travel Guide & Tips</h3>
                 <ul class="tips-list" id="tipsList"></ul>
+            </div>
+            
+            <!-- ENSEMBLE MODEL VISUALIZER -->
+            <div class="ensemble-visualizer" id="ensembleVisualizer" style="display:none">
+                <h3>🤖 Multi-Model Ensemble Visualizer</h3>
+                <p class="ensemble-sub">Comparing predictions and validation performance across multiple machine learning models</p>
+                <div class="ensemble-grid">
+                    <!-- Random Forest Card -->
+                    <div class="ensemble-card primary-model">
+                        <div class="ensemble-model-badge">Primary Model</div>
+                        <h4>Random Forest</h4>
+                        <div class="ensemble-metrics-box">
+                            <div class="ensemble-pred-row">
+                                <span class="ensemble-pred-label">Crowd Level:</span>
+                                <span class="ensemble-pred-val" id="rfEnsembleLevel">-</span>
+                            </div>
+                            <div class="ensemble-pred-row">
+                                <span class="ensemble-pred-label">Crowd Count:</span>
+                                <span class="ensemble-pred-val" id="rfEnsembleCount">-</span>
+                            </div>
+                        </div>
+                        <div class="ensemble-divider"></div>
+                        <div class="ensemble-accuracy-box">
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Classifier Accuracy:</span>
+                                <span class="metric-val" id="rfAccuracy">-</span>
+                            </div>
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Regressor MAE:</span>
+                                <span class="metric-val" id="rfMae">-</span>
+                            </div>
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Regressor R² Score:</span>
+                                <span class="metric-val" id="rfR2">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Decision Tree Card -->
+                    <div class="ensemble-card">
+                        <h4>Decision Tree</h4>
+                        <div class="ensemble-metrics-box">
+                            <div class="ensemble-pred-row">
+                                <span class="ensemble-pred-label">Crowd Level:</span>
+                                <span class="ensemble-pred-val" id="dtEnsembleLevel">-</span>
+                            </div>
+                            <div class="ensemble-pred-row">
+                                <span class="ensemble-pred-label">Crowd Count:</span>
+                                <span class="ensemble-pred-val" id="dtEnsembleCount">-</span>
+                            </div>
+                        </div>
+                        <div class="ensemble-divider"></div>
+                        <div class="ensemble-accuracy-box">
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Classifier Accuracy:</span>
+                                <span class="metric-val" id="dtAccuracy">-</span>
+                            </div>
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Regressor MAE:</span>
+                                <span class="metric-val" id="dtMae">-</span>
+                            </div>
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Regressor R² Score:</span>
+                                <span class="metric-val" id="dtR2">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gradient Boosting Card -->
+                    <div class="ensemble-card">
+                        <h4>Gradient Boosting</h4>
+                        <div class="ensemble-metrics-box">
+                            <div class="ensemble-pred-row">
+                                <span class="ensemble-pred-label">Crowd Level:</span>
+                                <span class="ensemble-pred-val" id="gbEnsembleLevel">-</span>
+                            </div>
+                            <div class="ensemble-pred-row">
+                                <span class="ensemble-pred-label">Crowd Count:</span>
+                                <span class="ensemble-pred-val" id="gbEnsembleCount">-</span>
+                            </div>
+                        </div>
+                        <div class="ensemble-divider"></div>
+                        <div class="ensemble-accuracy-box">
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Classifier Accuracy:</span>
+                                <span class="metric-val" id="gbAccuracy">-</span>
+                            </div>
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Regressor MAE:</span>
+                                <span class="metric-val" id="gbMae">-</span>
+                            </div>
+                            <div class="accuracy-metric">
+                                <span class="metric-label">Regressor R² Score:</span>
+                                <span class="metric-val" id="gbR2">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+    <!-- CROWD TRENDS & HOURLY CHART SECTION -->
+    <section class="chart-section" id="chartSection">
+        <div class="chart-header">
+            <h2>📈 Visit Analysis Charts</h2>
+            <div class="chart-tabs">
+                <button class="chart-tab-btn active" onclick="switchChartTab('monthly')">Monthly Trends</button>
+                <button class="chart-tab-btn" onclick="switchChartTab('hourly')">Hourly Distribution</button>
+            </div>
+        </div>
+        
+        <!-- Monthly Chart View -->
+        <div id="monthlyChartView">
+            <p class="chart-sub" id="chartSub">Predicted crowd patterns across the month</p>
+            <div class="chart-container">
+                <canvas id="crowdChart"></canvas>
+            </div>
+            <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#4CAF50"></span> Low</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#FFC107"></span> Moderate</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#FF9800"></span> High</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#F44336"></span> Extreme</span>
+                <span class="legend-item"><span class="legend-line"></span> Temperature</span>
+            </div>
+        </div>
+
+        <!-- Hourly Chart View -->
+        <div id="hourlyChartView" style="display:none">
+            <p class="chart-sub" id="hourlyChartSub">Predicted hourly crowd density and temperature distribution</p>
+            <div class="optimal-time-badge" id="optimalTimeBadge">🎯 Optimal Visit Time: <strong>-</strong></div>
+            <div class="chart-container">
+                <canvas id="hourlyChart"></canvas>
+            </div>
+            <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:rgba(212, 160, 23, 0.4)"></span> Crowd Density</span>
+                <span class="legend-item"><span class="legend-line"></span> Temperature</span>
             </div>
         </div>
     </section>
@@ -170,6 +311,8 @@
 
     <script>
         let activeTab = 'single';
+        let crowdChartInstance = null;
+        let hourlyChartInstance = null;
 
         /* Set min date to today */
         (function () { const d = document.getElementById('dateInput'); const t = new Date(); const y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0'), day = String(t.getDate()).padStart(2, '0'); d.min = `${y}-${m}-${day}`; const mx = new Date(t); mx.setFullYear(mx.getFullYear() + 1); d.max = `${mx.getFullYear()}-${String(mx.getMonth() + 1).padStart(2, '0')}-${String(mx.getDate()).padStart(2, '0')}` })();
@@ -186,6 +329,9 @@
         /* Format date nicely */
         function fmtDate(ds) { const d = new Date(ds + 'T00:00:00'); return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }) }
 
+        /* Format crowd count with commas */
+        function fmtCount(n) { return n.toLocaleString('en-IN') }
+
         /* Animate score ring */
         function animateScore(score) { const circ = document.getElementById('scoreFill'); const r = 68, c = 2 * Math.PI * r; circ.style.strokeDasharray = c; circ.style.strokeDashoffset = c; const color = score >= 70 ? '#4CAF50' : score >= 40 ? '#FF9800' : '#F44336'; circ.style.stroke = color; document.getElementById('scoreValue').style.color = color; setTimeout(() => { circ.style.strokeDashoffset = c - (score / 100) * c }, 50); let cur = 0; const end = score; const step = () => { cur += Math.ceil((end - cur) / 15) || 1; if (cur > end) cur = end; document.getElementById('scoreValue').textContent = cur; if (cur < end) requestAnimationFrame(step) }; step() }
 
@@ -194,6 +340,24 @@
 
         /* Temperature bar color */
         function tempColor(t) { if (t <= 24) return '#42A5F5'; if (t <= 30) return '#66BB6A'; if (t <= 35) return '#FFA726'; return '#EF5350' }
+
+        /* Crowd level to color */
+        function crowdLevelColor(l) {
+            const map = { 'Low': '#4CAF50', 'Moderate': '#FFC107', 'High': '#FF9800', 'Extreme': '#F44336' };
+            return map[l] || '#FFC107';
+        }
+
+        /* Generate star rating HTML */
+        function starRating(rating) {
+            let html = '';
+            const full = Math.floor(rating);
+            const half = rating - full >= 0.5;
+            for (let i = 0; i < full; i++) html += '★';
+            if (half) html += '★';
+            const empty = 5 - full - (half ? 1 : 0);
+            for (let i = 0; i < empty; i++) html += '☆';
+            return html;
+        }
 
         /* Tab switching */
         function switchTab(mode) {
@@ -213,6 +377,8 @@
             document.getElementById('resultsSection').classList.remove('visible');
             document.getElementById('compareResultsSection').classList.remove('visible');
             document.getElementById('betterSection').classList.remove('visible');
+            document.getElementById('chartSection').classList.remove('visible');
+            document.getElementById('ensembleVisualizer').style.display = 'none';
         }
 
         /* Checkbox handler - max 3 */
@@ -251,7 +417,8 @@
                 .then(r => r.json()).then(d => {
                     btn.classList.remove('loading'); btn.disabled = false;
                     if (d.error) { showToast(d.error, 'error'); return }
-                    renderResults(d, place, date)
+                    renderResults(d, place, date);
+                    fetchChartData(place, date);
                 }).catch(() => { btn.classList.remove('loading'); btn.disabled = false; showToast('Something went wrong. Please try again.', 'error') })
         }
 
@@ -294,19 +461,36 @@
             else { vc.classList.add('no'); document.getElementById('verdictEmoji').textContent = '❌'; document.getElementById('verdictText').textContent = 'NO — Avoid This Day'; document.getElementById('verdictSub').textContent = 'Very high crowds or poor conditions expected' }
             document.getElementById('placeDate').innerHTML = '<strong>' + place + '</strong> · ' + fmtDate(date);
             animateScore(d.visit_score);
+
             /* Crowd */
             document.getElementById('crowdBadge').innerHTML = '<span class="' + crowdClass(d.crowd_level) + '">' + d.crowd_level + '</span>';
             document.getElementById('crowdCount').textContent = 'Est. ' + d.crowd_count_est + ' visitors';
+            document.getElementById('crowdPredicted').innerHTML = '📈 Predicted: <strong>' + fmtCount(d.crowd_count_predicted) + '</strong> visitors';
+
             /* Weather */
             document.getElementById('weatherIcon').textContent = weatherIcon(d.weather);
             document.getElementById('weatherValue').textContent = d.weather;
+            const wsb = document.getElementById('weatherSourceBadge');
+            if (d.weather_source === 'Live Forecast') {
+                wsb.innerHTML = '🛰️ Live Forecast';
+                wsb.className = 'weather-source-badge live';
+            } else {
+                wsb.innerHTML = '🤖 ML Prediction';
+                wsb.className = 'weather-source-badge ml';
+            }
             const tb = document.getElementById('tempBar');
             tb.style.width = Math.min(100, ((d.temperature - 15) / 30) * 100) + '%';
             tb.style.background = tempColor(d.temperature);
-            document.getElementById('tempText').textContent = d.temperature + '°C';
+            let tempDisplay = d.temperature + '°C';
+            if (d.temp_max !== undefined && d.temp_min !== undefined) {
+                tempDisplay += ` (${d.temp_min}° – ${d.temp_max}°)`;
+            }
+            document.getElementById('tempText').textContent = tempDisplay;
+
             /* Day */
             document.getElementById('dayValue').textContent = d.day_of_week;
             document.getElementById('holidayInfo').textContent = d.holiday_info + (d.event_type !== 'Regular Day' ? ' · ' + d.event_type : '');
+
             /* Score card */
             document.getElementById('scoreText').textContent = d.visit_score + ' / 100';
             document.getElementById('scoreText').style.color = d.visit_score >= 70 ? 'var(--green)' : d.visit_score >= 40 ? 'var(--warn)' : 'var(--red)';
@@ -326,8 +510,48 @@
                 document.getElementById('tipsCard').style.display = 'none';
             }
 
+            switchChartTab('monthly');
+
+            /* Render Ensemble Visualizer */
+            if (d.ensemble_predictions && d.model_metrics) {
+                // RF Accuracy
+                document.getElementById('rfEnsembleLevel').className = 'ensemble-pred-val ' + crowdClass(d.ensemble_predictions['Random Forest'].crowd_level);
+                document.getElementById('rfEnsembleLevel').textContent = d.ensemble_predictions['Random Forest'].crowd_level;
+                document.getElementById('rfEnsembleCount').textContent = fmtCount(d.ensemble_predictions['Random Forest'].crowd_count) + ' visitors';
+                document.getElementById('rfAccuracy').textContent = (d.model_metrics.classification['Random Forest'].accuracy * 100).toFixed(1) + '%';
+                document.getElementById('rfMae').textContent = fmtCount(d.model_metrics.regression['Random Forest'].mae) + ' visitors';
+                document.getElementById('rfR2').textContent = d.model_metrics.regression['Random Forest'].r2.toFixed(3);
+
+                // DT Accuracy
+                document.getElementById('dtEnsembleLevel').className = 'ensemble-pred-val ' + crowdClass(d.ensemble_predictions['Decision Tree'].crowd_level);
+                document.getElementById('dtEnsembleLevel').textContent = d.ensemble_predictions['Decision Tree'].crowd_level;
+                document.getElementById('dtEnsembleCount').textContent = fmtCount(d.ensemble_predictions['Decision Tree'].crowd_count) + ' visitors';
+                document.getElementById('dtAccuracy').textContent = (d.model_metrics.classification['Decision Tree'].accuracy * 100).toFixed(1) + '%';
+                document.getElementById('dtMae').textContent = fmtCount(d.model_metrics.regression['Decision Tree'].mae) + ' visitors';
+                document.getElementById('dtR2').textContent = d.model_metrics.regression['Decision Tree'].r2.toFixed(3);
+
+                // GB Accuracy
+                document.getElementById('gbEnsembleLevel').className = 'ensemble-pred-val ' + crowdClass(d.ensemble_predictions['Gradient Boosting'].crowd_level);
+                document.getElementById('gbEnsembleLevel').textContent = d.ensemble_predictions['Gradient Boosting'].crowd_level;
+                document.getElementById('gbEnsembleCount').textContent = fmtCount(d.ensemble_predictions['Gradient Boosting'].crowd_count) + ' visitors';
+                document.getElementById('gbAccuracy').textContent = (d.model_metrics.classification['Gradient Boosting'].accuracy * 100).toFixed(1) + '%';
+                document.getElementById('gbMae').textContent = fmtCount(d.model_metrics.regression['Gradient Boosting'].mae) + ' visitors';
+                document.getElementById('gbR2').textContent = d.model_metrics.regression['Gradient Boosting'].r2.toFixed(3);
+
+                document.getElementById('ensembleVisualizer').style.display = 'block';
+            } else {
+                document.getElementById('ensembleVisualizer').style.display = 'none';
+            }
+
+            /* Render Hourly Distribution */
+            if (d.hourly_distribution) {
+                document.getElementById('optimalTimeBadge').innerHTML = '🎯 Optimal Visit Time: <strong>' + d.best_time_to_visit + '</strong> (Lowest crowd density & coolest temps)';
+                renderHourlyChart(d.hourly_distribution);
+            }
+
             rs.classList.add('visible');
             rs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
             /* Better dates */
             const bs = document.getElementById('betterSection');
             const bg = document.getElementById('betterGrid');
@@ -337,11 +561,223 @@
                     const card = document.createElement('div');
                     card.className = 'better-card' + (idx === 0 ? ' best-choice' : '');
                     const bestBadge = idx === 0 ? '<div class="best-badge">★ Best Choice</div>' : '';
-                    card.innerHTML = `${bestBadge}<div class="better-date">${fmtDate(b.date)}</div><div class="better-info"><span><span class="${crowdClass(b.crowd_level)}">${b.crowd_level}</span></span><span>${weatherIcon(b.weather)} ${b.weather} · ${b.temperature}°C</span><span>🎯 Score: ${b.visit_score}/100</span><span style="color:var(--muted);font-size:0.8rem">${b.holiday_info}</span></div><button class="plan-btn" onclick="planVisit('${b.date}')">Plan This Visit</button>`;
+                    card.innerHTML = `${bestBadge}<div class="better-date">${fmtDate(b.date)}</div><div class="better-info"><span><span class="${crowdClass(b.crowd_level)}">${b.crowd_level}</span></span><span>📈 ~${fmtCount(b.crowd_count_predicted)} visitors</span><span>${weatherIcon(b.weather)} ${b.weather} · ${b.temperature}°C</span><span>🎯 Score: ${b.visit_score}/100</span><span style="color:var(--muted);font-size:0.8rem">${b.holiday_info}</span></div><button class="plan-btn" onclick="planVisit('${b.date}')">Plan This Visit</button>`;
                     bg.appendChild(card)
                 });
                 bs.classList.add('visible')
             } else { bs.classList.remove('visible') }
+        }
+
+        /* Fetch and render chart data */
+        function fetchChartData(place, date) {
+            fetch('/chart-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ place, date }) })
+                .then(r => r.json()).then(d => {
+                    if (d.error) return;
+                    renderChart(d, date);
+                    document.getElementById('chartSection').classList.add('visible');
+                }).catch(() => {});
+        }
+
+        /* Render Chart.js crowd trends chart */
+        function renderChart(data, selectedDate) {
+            const ctx = document.getElementById('crowdChart').getContext('2d');
+            document.getElementById('chartSub').textContent = 'Predicted crowd patterns for ' + data.month_name;
+
+            // Destroy previous chart
+            if (crowdChartInstance) crowdChartInstance.destroy();
+
+            // Prepare data
+            const labels = data.dates.map(d => {
+                const dt = new Date(d + 'T00:00:00');
+                return dt.getDate();
+            });
+
+            const barColors = data.crowd_levels.map(l => crowdLevelColor(l));
+            const borderColors = data.dates.map(d => d === selectedDate ? '#D4A017' : 'transparent');
+            const borderWidths = data.dates.map(d => d === selectedDate ? 3 : 0);
+
+            crowdChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Predicted Crowd Count',
+                            data: data.crowd_counts,
+                            backgroundColor: barColors.map(c => c + '99'),
+                            borderColor: borderColors,
+                            borderWidth: borderWidths,
+                            borderRadius: 4,
+                            yAxisID: 'y',
+                            order: 2,
+                        },
+                        {
+                            label: 'Temperature (°C)',
+                            data: data.temperatures,
+                            type: 'line',
+                            borderColor: '#E8650A',
+                            backgroundColor: 'rgba(232, 101, 10, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            pointBackgroundColor: '#E8650A',
+                            tension: 0.3,
+                            fill: false,
+                            yAxisID: 'y1',
+                            order: 1,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1A1200',
+                            borderColor: '#3D2E00',
+                            borderWidth: 1,
+                            titleColor: '#D4A017',
+                            bodyColor: '#F5E6C8',
+                            padding: 12,
+                            displayColors: true,
+                            callbacks: {
+                                title: function(items) {
+                                    const idx = items[0].dataIndex;
+                                    const dateStr = data.dates[idx];
+                                    const dt = new Date(dateStr + 'T00:00:00');
+                                    return dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+                                },
+                                afterTitle: function(items) {
+                                    const idx = items[0].dataIndex;
+                                    return 'Crowd Level: ' + data.crowd_levels[idx] + ' | Score: ' + data.visit_scores[idx] + '/100';
+                                },
+                                label: function(ctx) {
+                                    if (ctx.datasetIndex === 0) return ' Visitors: ~' + ctx.raw.toLocaleString('en-IN');
+                                    return ' Temp: ' + ctx.raw + '°C';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(61, 46, 0, 0.3)' },
+                            ticks: { color: '#A89060', font: { family: 'Lato' } },
+                            title: { display: true, text: 'Day of Month', color: '#A89060', font: { family: 'Cinzel', size: 12 } }
+                        },
+                        y: {
+                            position: 'left',
+                            grid: { color: 'rgba(61, 46, 0, 0.2)' },
+                            ticks: { color: '#A89060', font: { family: 'Lato' }, callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'K' : v },
+                            title: { display: true, text: 'Crowd Count', color: '#A89060', font: { family: 'Cinzel', size: 12 } }
+                        },
+                        y1: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#E8650A', font: { family: 'Lato' }, callback: v => v + '°C' },
+                            title: { display: true, text: 'Temperature', color: '#E8650A', font: { family: 'Cinzel', size: 12 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function switchChartTab(tab) {
+            // Update tab button classes
+            const btns = document.querySelectorAll('.chart-tab-btn');
+            btns.forEach(btn => {
+                if (btn.textContent.toLowerCase().includes(tab)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Toggle views
+            if (tab === 'monthly') {
+                document.getElementById('monthlyChartView').style.display = 'block';
+                document.getElementById('hourlyChartView').style.display = 'none';
+            } else {
+                document.getElementById('monthlyChartView').style.display = 'none';
+                document.getElementById('hourlyChartView').style.display = 'block';
+            }
+        }
+
+        function renderHourlyChart(hourlyData) {
+            const ctx = document.getElementById('hourlyChart').getContext('2d');
+            
+            // Destroy previous instance
+            if (hourlyChartInstance) hourlyChartInstance.destroy();
+            
+            const labels = hourlyData.map(h => h.hour);
+            const counts = hourlyData.map(h => h.crowd_count);
+            const temps = hourlyData.map(h => h.temperature);
+            
+            hourlyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Crowd Density (Visitors)',
+                            data: counts,
+                            borderColor: 'rgba(212, 160, 23, 0.8)',
+                            backgroundColor: 'rgba(212, 160, 23, 0.15)',
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Temperature (°C)',
+                            data: temps,
+                            borderColor: '#E8650A',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2.5,
+                            pointRadius: 3,
+                            tension: 0.2,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0F0A00',
+                            titleColor: '#D4A017',
+                            bodyColor: '#FDFCF7',
+                            borderColor: '#3D2E00',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(ctx) {
+                                    if (ctx.datasetIndex === 0) return ' Crowd Density: ' + ctx.raw.toLocaleString('en-IN') + ' visitors';
+                                    return ' Temperature: ' + ctx.raw + '°C';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(61, 46, 0, 0.3)' },
+                            ticks: { color: '#A89060', font: { family: 'Lato' } }
+                        },
+                        y: {
+                            position: 'left',
+                            grid: { color: 'rgba(61, 46, 0, 0.2)' },
+                            ticks: { color: '#A89060', font: { family: 'Lato' }, callback: v => v >= 1000 ? (v/1000).toFixed(1) + 'K' : v },
+                            title: { display: true, text: 'Expected Visitors', color: '#A89060', font: { family: 'Cinzel', size: 12 } }
+                        },
+                        y1: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#E8650A', font: { family: 'Lato' }, callback: v => v + '°C' },
+                            title: { display: true, text: 'Temperature', color: '#E8650A', font: { family: 'Cinzel', size: 12 } }
+                        }
+                    }
+                }
+            });
         }
 
         /* Render comparison results */
@@ -349,6 +785,7 @@
             // Hide single results
             document.getElementById('resultsSection').classList.remove('visible');
             document.getElementById('betterSection').classList.remove('visible');
+            document.getElementById('chartSection').classList.remove('visible');
 
             const crs = document.getElementById('compareResultsSection');
             const cg = document.getElementById('compareGrid');
@@ -374,6 +811,8 @@
                     `;
                 }
 
+
+
                 col.innerHTML = `
                     ${bestBadge}
                     <div class="compare-dest-name">${d.place.split(',')[0]}</div>
@@ -395,7 +834,7 @@
                             <div class="compare-metric-info">
                                 <div class="compare-metric-title">Crowd Level</div>
                                 <div class="compare-metric-val"><span class="${crowdClass(d.crowd_level)}">${d.crowd_level}</span></div>
-                                <div class="compare-metric-sub">Est. ${d.crowd_count_est} visitors</div>
+                                <div class="compare-metric-sub">~${fmtCount(d.crowd_count_predicted)} visitors</div>
                             </div>
                         </div>
                         
@@ -404,6 +843,7 @@
                             <div class="compare-metric-info">
                                 <div class="compare-metric-title">Weather & Temp</div>
                                 <div class="compare-metric-val">${d.weather} · ${d.temperature}°C</div>
+                                <div class="compare-metric-sub weather-source-inline ${d.weather_source === 'Live Forecast' ? 'live' : 'ml'}">${d.weather_source === 'Live Forecast' ? '🛰️ Live' : '🤖 ML'}</div>
                             </div>
                         </div>
                         
@@ -417,6 +857,7 @@
                     </div>
                     
                     ${tipsHtml}
+                    <button class="plan-btn compare-plan-btn" onclick="planCompareVisit('${d.place}', '${date}')">Plan This Visit</button>
                 `;
                 cg.appendChild(col);
             });
@@ -432,6 +873,15 @@
             document.getElementById('dateInput').value = date;
             document.getElementById('inputCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
             setTimeout(handlePredict, 300)
+        }
+
+        /* Plan visit from comparison column */
+        function planCompareVisit(place, date) {
+            switchTab('single');
+            document.getElementById('placeSelect').value = place;
+            document.getElementById('dateInput').value = date;
+            document.getElementById('inputCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(handlePredict, 300);
         }
 
         /* Enter key to submit */

@@ -3,6 +3,15 @@ app.py — Flask Backend for "Should I Visit?" Crowd Predictor
 =============================================================
 Loads trained ML models, serves the frontend, and handles
 prediction requests via a REST API endpoint.
+
+Features:
+  - Crowd level classification (Low/Moderate/High/Extreme)
+  - Crowd count regression (actual visitor numbers)
+  - Temperature prediction
+  - Weather API integration (Open-Meteo live forecast + ML fallback)
+  - Monthly crowd trend chart data
+  - Landmark comparison
+  - Better date suggestions
 """
 
 import os
@@ -11,8 +20,10 @@ import json
 import numpy as np
 import pandas as pd
 import joblib
+import requests
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, send_from_directory
+
 
 # ══════════════════════════════════════════════════════
 # CONSTANTS — Indian Public Holidays & Festival Calendar
@@ -143,6 +154,34 @@ PLACES = [
     "India Gate, Delhi",
 ]
 
+# ── Place Coordinates for Weather API ─────────────────
+PLACE_COORDINATES = {
+    "Taj Mahal, Agra":               {"lat": 27.1751, "lon": 78.0421},
+    "Red Fort, Delhi":               {"lat": 28.6562, "lon": 77.2410},
+    "India Gate, Delhi":             {"lat": 28.6129, "lon": 77.2295},
+    "Qutub Minar, Delhi":           {"lat": 28.5245, "lon": 77.1855},
+    "Varanasi Ghats, Varanasi":      {"lat": 25.3176, "lon": 83.0107},
+    "Gateway of India, Mumbai":      {"lat": 18.9220, "lon": 72.8347},
+    "Mecca Masjid, Hyderabad":       {"lat": 17.3604, "lon": 78.4736},
+    "Sanchi Stupa, Madhya Pradesh":  {"lat": 23.4793, "lon": 77.7398},
+}
+
+# ── WMO Weather Code Mapping ─────────────────────────
+WMO_WEATHER_MAP = {
+    0: "Clear", 1: "Clear", 2: "Cloudy", 3: "Cloudy",
+    45: "Cloudy", 48: "Cloudy",
+    51: "Rainy", 53: "Rainy", 55: "Rainy",
+    56: "Rainy", 57: "Rainy",
+    61: "Rainy", 63: "Rainy", 65: "Rainy",
+    66: "Rainy", 67: "Rainy",
+    71: "Cloudy", 73: "Cloudy", 75: "Cloudy",
+    77: "Cloudy",
+    80: "Rainy", 81: "Rainy", 82: "Rainy",
+    85: "Cloudy", 86: "Cloudy",
+    95: "Rainy", 96: "Rainy", 99: "Rainy",
+}
+
+
 # ══════════════════════════════════════════════════════
 # FLASK APP SETUP
 # ══════════════════════════════════════════════════════
@@ -153,11 +192,13 @@ app = Flask(__name__)
 
 
 def load_models():
-    """Load all trained models, encoders, and lookup tables from models/ directory."""
+    """Load all trained ML models, encoders, and metrics from disk."""
     model_dir = "models"
     required_files = [
-        "crowd_model.pkl", "temp_model.pkl",
-        "encoders.pkl", "weather_lookup.pkl"
+        "crowd_model.pkl", "temp_model.pkl", "crowd_count_model.pkl",
+        "dt_crowd_model.pkl", "dt_crowd_count_model.pkl",
+        "gb_crowd_model.pkl", "gb_crowd_count_model.pkl",
+        "encoders.pkl", "weather_lookup.pkl", "model_metrics.json"
     ]
 
     # Check models directory exists
@@ -175,17 +216,213 @@ def load_models():
             print("  Please run: python train_model.py")
             sys.exit(1)
 
-    crowd_model = joblib.load(os.path.join(model_dir, "crowd_model.pkl"))
+    # Load model binaries
+    rf_crowd = joblib.load(os.path.join(model_dir, "crowd_model.pkl"))
+    dt_crowd = joblib.load(os.path.join(model_dir, "dt_crowd_model.pkl"))
+    gb_crowd = joblib.load(os.path.join(model_dir, "gb_crowd_model.pkl"))
+
     temp_model = joblib.load(os.path.join(model_dir, "temp_model.pkl"))
+
+    rf_cc = joblib.load(os.path.join(model_dir, "crowd_count_model.pkl"))
+    dt_cc = joblib.load(os.path.join(model_dir, "dt_crowd_count_model.pkl"))
+    gb_cc = joblib.load(os.path.join(model_dir, "gb_crowd_count_model.pkl"))
+
     encoders = joblib.load(os.path.join(model_dir, "encoders.pkl"))
     weather_lookup = joblib.load(os.path.join(model_dir, "weather_lookup.pkl"))
 
-    print("  ✓ All models loaded successfully!")
-    return crowd_model, temp_model, encoders, weather_lookup
+    # Load metrics JSON
+    with open(os.path.join(model_dir, "model_metrics.json"), "r", encoding="utf-8") as f:
+        model_metrics = json.load(f)
+
+    print("  ✓ All models and metrics loaded successfully!")
+    
+    return {
+        "classifiers": {"Random Forest": rf_crowd, "Decision Tree": dt_crowd, "Gradient Boosting": gb_crowd},
+        "temp_model": temp_model,
+        "regressors": {"Random Forest": rf_cc, "Decision Tree": dt_cc, "Gradient Boosting": gb_cc},
+        "encoders": encoders,
+        "weather_lookup": weather_lookup,
+        "metrics": model_metrics
+    }
 
 
 # Load models at startup
-crowd_model, temp_model, encoders, weather_lookup = load_models()
+loaded = load_models()
+crowd_model = loaded["classifiers"]["Random Forest"]
+temp_model = loaded["temp_model"]
+crowd_count_model = loaded["regressors"]["Random Forest"]
+encoders = loaded["encoders"]
+weather_lookup = loaded["weather_lookup"]
+model_metrics = loaded["metrics"]
+classifiers = loaded["classifiers"]
+regressors = loaded["regressors"]
+
+# Landmark-specific hourly density profiles (weights for each hour from 6 AM to 9 PM)
+HOURLY_PROFILES = {
+    "Taj Mahal, Agra": [
+        12, 14, 10, 8, 7, 6, 5, 4, 4, 6, 10, 14, 10, 0, 0, 0 # Closed after sunset (6 PM onwards set to 0)
+    ],
+    "Varanasi Ghats, Varanasi": [
+        18, 14, 8, 5, 4, 3, 3, 2, 2, 3, 6, 12, 16, 12, 6, 2  # Peaks at 6 AM and 6 PM for Aarti
+    ],
+    "India Gate, Delhi": [
+        1, 2, 3, 3, 4, 3, 2, 2, 4, 8, 14, 20, 22, 18, 12, 6   # Massively peaks in the evening (5 PM - 9 PM)
+    ],
+    "Gateway of India, Mumbai": [
+        3, 4, 5, 6, 6, 5, 4, 4, 6, 8, 12, 16, 18, 14, 8, 4    # Sunset/evening peak
+    ],
+    "Red Fort, Delhi": [
+        0, 0, 0, 8, 12, 14, 15, 12, 10, 10, 12, 12, 5, 0, 0, 0 # Open 9 AM - 6 PM, peaks mid-day
+    ],
+    "Qutub Minar, Delhi": [
+        0, 2, 4, 8, 10, 12, 10, 8, 8, 10, 12, 14, 8, 4, 0, 0  # Open 7 AM - 9 PM, peaks mid-day and sunset
+    ],
+    "Mecca Masjid, Hyderabad": [
+        0, 0, 4, 6, 8, 14, 16, 10, 8, 12, 14, 8, 4, 0, 0, 0   # Peaks around Dhuhr (12 PM - 2 PM) and Asr (4 PM - 5 PM)
+    ],
+    "Sanchi Stupa, Madhya Pradesh": [
+        2, 4, 6, 10, 14, 16, 15, 12, 10, 8, 6, 4, 2, 0, 0, 0  # Open 6:30 AM - 6:30 PM, peak mid-day
+    ]
+}
+
+
+def generate_hourly_data(place, daily_count, daily_temp):
+    """Generate hourly crowd counts and temperatures for the landmark."""
+    hours = ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+             "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"]
+    
+    # Temperature hourly offsets (relative to daily average)
+    temp_offsets = [-4, -3, -1, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0, -1, -2]
+    
+    # Get profile or fallback to a standard bell curve
+    profile = HOURLY_PROFILES.get(place, [4, 5, 6, 7, 8, 9, 10, 9, 8, 7, 6, 5, 4, 4, 4, 4])
+    
+    # Normalize profile weights
+    total_weight = sum(profile)
+    normalized_weights = [w / total_weight for w in profile]
+    
+    hourly_data = []
+    for i, hour in enumerate(hours):
+        h_weight = normalized_weights[i]
+        
+        # Calculate crowd count at this hour
+        h_count = int(round(daily_count * h_weight))
+        
+        # Temperature
+        h_temp = int(round(daily_temp + temp_offsets[i]))
+        
+        hourly_data.append({
+            "hour": hour,
+            "crowd_count": max(0, h_count),
+            "temperature": h_temp
+        })
+        
+    return hourly_data
+
+
+def predict_ensemble(place, date_str):
+    """Generate predictions from all three ensemble models (RF, DT, GB)."""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+    month = date_obj.month
+    day_of_month = date_obj.day
+    week_of_year = date_obj.isocalendar()[1]
+    day_of_week = get_day_of_week_string(date_obj)
+    is_weekend = 1 if day_of_week in ["Saturday", "Sunday"] else 0
+    holiday_info_data = is_indian_holiday(date_str)
+    is_holiday = 1 if holiday_info_data else 0
+    event_type = get_event_type(date_str, month, day_of_month)
+    is_festival = 1 if event_type in ["Festival", "National Holiday", "Cultural Event"] else 0
+
+    place_enc = encoders["Place"].transform([place])[0]
+    event_enc = encoders["Event"].transform([event_type])[0]
+
+    features = np.array([[
+        place_enc, month, day_of_month, week_of_year,
+        is_weekend, is_holiday, is_festival, event_enc
+    ]])
+
+    predictions = {}
+    for name in ["Random Forest", "Decision Tree", "Gradient Boosting"]:
+        # Predict crowd level
+        clf = classifiers[name]
+        cl_enc = clf.predict(features)[0]
+        cl = encoders["crowd_level"].inverse_transform([cl_enc])[0]
+
+        # Predict raw crowd count
+        reg = regressors[name]
+        cc = int(round(reg.predict(features)[0]))
+        cc = max(0, cc)
+
+        predictions[name] = {
+            "crowd_level": cl,
+            "crowd_count": cc
+        }
+
+    return predictions
+
+# ══════════════════════════════════════════════════════
+# WEATHER API (Open-Meteo)
+# ══════════════════════════════════════════════════════
+
+
+def fetch_live_weather(place, date_str):
+    """Fetch weather from Open-Meteo API for dates within forecast range.
+
+    Returns dict with temperature, weather, weather_source or None if unavailable.
+    """
+    coords = PLACE_COORDINATES.get(place)
+    if not coords:
+        return None
+
+    target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    today = datetime.now().date()
+    days_ahead = (target_date - today).days
+
+    # Open-Meteo provides 16-day forecasts
+    if days_ahead < 0 or days_ahead > 15:
+        return None
+
+    try:
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": coords["lat"],
+            "longitude": coords["lon"],
+            "daily": "temperature_2m_max,temperature_2m_min,weather_code",
+            "start_date": date_str,
+            "end_date": date_str,
+            "timezone": "Asia/Kolkata",
+        }
+        resp = requests.get(url, params=params, timeout=5)
+        if resp.status_code != 200:
+            return None
+
+        data = resp.json()
+        daily = data.get("daily", {})
+
+        if not daily.get("temperature_2m_max"):
+            return None
+
+        temp_max = daily["temperature_2m_max"][0]
+        temp_min = daily["temperature_2m_min"][0]
+        weather_code = daily["weather_code"][0]
+
+        avg_temp = int(round((temp_max + temp_min) / 2))
+        weather = WMO_WEATHER_MAP.get(weather_code, "Clear")
+
+        return {
+            "temperature": avg_temp,
+            "weather": weather,
+            "weather_source": "Live Forecast",
+            "temp_max": int(round(temp_max)),
+            "temp_min": int(round(temp_min)),
+        }
+    except (requests.RequestException, KeyError, TypeError, ValueError) as e:
+        print(f"  ⚠ Weather API error: {e}")
+        return None
 
 
 # ══════════════════════════════════════════════════════
@@ -321,11 +558,27 @@ def predict_for_date(place, date_str):
     crowd_level_enc = crowd_model.predict(features)[0]
     crowd_level = encoders["crowd_level"].inverse_transform([crowd_level_enc])[0]
 
-    # Predict temperature
-    temperature = int(round(temp_model.predict(features)[0]))
+    # Predict raw crowd count
+    crowd_count_predicted = int(round(crowd_count_model.predict(features)[0]))
+    crowd_count_predicted = max(0, crowd_count_predicted)  # Clamp to 0
 
-    # Get weather from lookup
-    weather = weather_lookup.get((place, month), "Clear")
+    # Predict temperature (ML fallback)
+    ml_temperature = int(round(temp_model.predict(features)[0]))
+
+    # Get weather — try live API first, then fallback to lookup
+    live_weather = fetch_live_weather(place, date_str)
+    if live_weather:
+        temperature = live_weather["temperature"]
+        weather = live_weather["weather"]
+        weather_source = live_weather["weather_source"]
+        temp_max = live_weather.get("temp_max")
+        temp_min = live_weather.get("temp_min")
+    else:
+        temperature = ml_temperature
+        weather = weather_lookup.get((place, month), "Clear")
+        weather_source = "ML Prediction"
+        temp_max = None
+        temp_min = None
 
     # Compute visit score
     visit_score = CROWD_SCORE_BASE.get(crowd_level, 50)
@@ -354,17 +607,19 @@ def predict_for_date(place, date_str):
     else:
         recommendation = "NO"
 
-    # Crowd count estimate
+    # Crowd count estimate (category range + predicted number)
     crowd_count_est = CROWD_COUNT_RANGES.get(crowd_level, "Unknown")
 
     # Generate travel tips
     tips = generate_tips(temperature, weather, crowd_level)
 
-    return {
+    result = {
         "crowd_level": crowd_level,
         "crowd_count_est": crowd_count_est,
+        "crowd_count_predicted": crowd_count_predicted,
         "temperature": temperature,
         "weather": weather,
+        "weather_source": weather_source,
         "visit_score": visit_score,
         "recommendation": recommendation,
         "holiday_info": holiday_info,
@@ -373,6 +628,12 @@ def predict_for_date(place, date_str):
         "date": date_str,
         "tips": tips,
     }
+
+    if temp_max is not None:
+        result["temp_max"] = temp_max
+        result["temp_min"] = temp_min
+
+    return result
 
 
 def find_better_dates(place, start_date_str):
@@ -392,6 +653,7 @@ def find_better_dates(place, start_date_str):
             "date": check_str,
             "day_of_week": result["day_of_week"],
             "crowd_level": result["crowd_level"],
+            "crowd_count_predicted": result["crowd_count_predicted"],
             "temperature": result["temperature"],
             "weather": result["weather"],
             "visit_score": result["visit_score"],
@@ -454,6 +716,24 @@ def predict():
         # Always find better dates for the selected place
         result["better_dates"] = find_better_dates(place, date_str)
 
+        # Generate ensemble predictions
+        ensemble = predict_ensemble(place, date_str)
+
+        # Generate hourly distribution
+        hourly = generate_hourly_data(place, result["crowd_count_predicted"], result["temperature"])
+        
+        # Get best hour to visit
+        operating_hours = [h for h in hourly if h["crowd_count"] > 0]
+        if not operating_hours:
+            operating_hours = hourly
+        best_hour_data = min(operating_hours, key=lambda x: (x["crowd_count"], x["temperature"]))
+        
+        # Inject into result
+        result["ensemble_predictions"] = ensemble
+        result["model_metrics"] = model_metrics
+        result["hourly_distribution"] = hourly
+        result["best_time_to_visit"] = best_hour_data["hour"]
+
         return jsonify(result)
 
     except Exception as e:
@@ -508,6 +788,61 @@ def compare():
     except Exception as e:
         print(f"  ❌ Comparison error: {e}")
         return jsonify({"error": "Something went wrong. Please try again."}), 500
+
+
+
+@app.route("/chart-data", methods=["POST"])
+def chart_data():
+    """Return monthly crowd trend data for Chart.js visualization."""
+    try:
+        data = request.get_json()
+        place = data.get("place", "").strip()
+        date_str = data.get("date", "").strip()
+
+        if place not in PLACES:
+            return jsonify({"error": f"Unknown place: {place}"}), 400
+
+        # Parse the target date to get month/year
+        target_date = datetime.strptime(date_str, "%Y-%m-%d")
+        year = target_date.year
+        month = target_date.month
+
+        # Generate predictions for each day of the month
+        import calendar
+        days_in_month = calendar.monthrange(year, month)[1]
+
+        dates = []
+        crowd_counts = []
+        crowd_levels = []
+        temperatures = []
+        visit_scores = []
+
+        for day in range(1, days_in_month + 1):
+            day_str = f"{year}-{month:02d}-{day:02d}"
+            result = predict_for_date(place, day_str)
+
+            if "error" in result:
+                continue
+
+            dates.append(day_str)
+            crowd_counts.append(result["crowd_count_predicted"])
+            crowd_levels.append(result["crowd_level"])
+            temperatures.append(result["temperature"])
+            visit_scores.append(result["visit_score"])
+
+        return jsonify({
+            "dates": dates,
+            "crowd_counts": crowd_counts,
+            "crowd_levels": crowd_levels,
+            "temperatures": temperatures,
+            "visit_scores": visit_scores,
+            "selected_date": date_str,
+            "month_name": target_date.strftime("%B %Y"),
+        })
+
+    except Exception as e:
+        print(f"  ❌ Chart data error: {e}")
+        return jsonify({"error": "Something went wrong."}), 500
 
 
 # ══════════════════════════════════════════════════════

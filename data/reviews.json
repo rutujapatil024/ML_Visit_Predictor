@@ -1,0 +1,702 @@
+[
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Absolutely breathtaking! The Taj Mahal at sunrise is one of the most beautiful sights I have ever seen. The marble shines with a warm golden glow. Truly a wonder of the world.",
+    "rating": 5,
+    "author": "Priya S.",
+    "date": "2025-11-15"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Stunning architecture but extremely crowded on weekends. Long queues for tickets. If you can, visit on a weekday morning.",
+    "rating": 4,
+    "author": "Amit K.",
+    "date": "2025-10-22"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "A must-visit monument. The symmetry and craftsmanship are unmatched. The gardens are well-maintained and beautiful for photos.",
+    "rating": 5,
+    "author": "Sarah M.",
+    "date": "2025-12-03"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Beautiful but overrated in my opinion. Too many tourists, aggressive hawkers outside, and the surrounding area is not clean at all.",
+    "rating": 3,
+    "author": "Rajesh V.",
+    "date": "2025-09-18"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Visited during monsoon season. The weather was humid and uncomfortable. The marble gets slippery when wet. Not the best time to visit.",
+    "rating": 2,
+    "author": "Neha G.",
+    "date": "2025-07-25"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "The intricate inlay work on the marble is mesmerizing. Spent hours just admiring the details. Highly recommend hiring a guide.",
+    "rating": 5,
+    "author": "David L.",
+    "date": "2025-01-10"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Went during Diwali week. The crowd was insane but the light show in the evening was spectacular. Mixed experience overall.",
+    "rating": 3,
+    "author": "Kavita R.",
+    "date": "2025-10-20"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "The entry fee is reasonable. Early morning visits are the best. The reflection in the water pool is iconic. Every Indian should visit at least once.",
+    "rating": 5,
+    "author": "Suresh P.",
+    "date": "2025-02-14"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Disappointing visit. Scaffolding covered parts of the monument for restoration. Could not get the classic photo. Waste of a trip.",
+    "rating": 1,
+    "author": "Manish T.",
+    "date": "2025-06-08"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "The moonlight visit on full moon night is magical. Limited tickets so book well in advance. An unforgettable experience.",
+    "rating": 5,
+    "author": "Ananya D.",
+    "date": "2025-03-12"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Good experience overall. The Mehtab Bagh across the river gives a beautiful alternative view of the Taj. Less crowded too.",
+    "rating": 4,
+    "author": "Rohit B.",
+    "date": "2025-11-28"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Visited with family. Kids loved it. The audio guide is informative. Clean washrooms available inside. Well-managed heritage site.",
+    "rating": 4,
+    "author": "Meera J.",
+    "date": "2025-12-20"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Summer visit was a mistake. 45 degree heat made it unbearable. The marble burns your feet. Go in winter only.",
+    "rating": 2,
+    "author": "Arjun N.",
+    "date": "2025-05-15"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Excellent heritage site. The museum inside has original architectural plans. Photography is wonderful in the golden hour light.",
+    "rating": 5,
+    "author": "Lisa W.",
+    "date": "2025-01-30"
+  },
+  {
+    "place": "Taj Mahal, Agra",
+    "text": "Worth every minute. The love story behind this monument makes it even more special. A symbol of eternal love and incredible art.",
+    "rating": 5,
+    "author": "Deepak C.",
+    "date": "2025-02-28"
+  },
+
+  {
+    "place": "Red Fort, Delhi",
+    "text": "The Red Fort is a magnificent piece of Mughal architecture. The light and sound show in the evening is a must-watch. Very informative and dramatic.",
+    "rating": 5,
+    "author": "Vikram S.",
+    "date": "2025-01-26"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Visited on Independence Day. The flag hoisting ceremony was patriotic and emotional. Massive crowds but an unforgettable experience.",
+    "rating": 5,
+    "author": "Pooja M.",
+    "date": "2025-08-15"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "The fort is impressive from outside but the inside is mostly empty halls. Expected more exhibits and displays. Felt like a letdown.",
+    "rating": 2,
+    "author": "Sameer K.",
+    "date": "2025-04-10"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Beautiful red sandstone architecture. The Diwan-i-Aam and Diwan-i-Khas are highlights. Good for history enthusiasts.",
+    "rating": 4,
+    "author": "Ritu A.",
+    "date": "2025-11-05"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Very crowded during holidays. Long ticket queues. The nearby Chandni Chowk street food makes it worth the trip though.",
+    "rating": 3,
+    "author": "Karan P.",
+    "date": "2025-10-02"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "A symbol of Indian independence and heritage. Well-maintained gardens. The museum showcasing freedom struggle artifacts is excellent.",
+    "rating": 5,
+    "author": "Nandini R.",
+    "date": "2025-03-20"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Good historical site but summer heat in Delhi makes it tough. Carry water and an umbrella. Not much shade inside the fort.",
+    "rating": 3,
+    "author": "Aakash D.",
+    "date": "2025-06-12"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Went in winter. Perfect weather for exploring. The massive walls and gates are very impressive. Great for photography.",
+    "rating": 4,
+    "author": "Jennifer H.",
+    "date": "2025-12-15"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Disappointing cleanliness standards. Graffiti on some walls. The archaeological survey needs to maintain it better.",
+    "rating": 2,
+    "author": "Vivek L.",
+    "date": "2025-05-22"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Perfect place to start a Delhi heritage walk. Combine with Jama Masjid and Chandni Chowk for a full day experience.",
+    "rating": 4,
+    "author": "Sneha B.",
+    "date": "2025-02-08"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "The Naubat Khana (Drum House) is architecturally stunning. The entire complex tells the story of Mughal grandeur. Loved it.",
+    "rating": 5,
+    "author": "Harsh V.",
+    "date": "2025-01-14"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Entry fee is very affordable. Spend at least 2-3 hours here. The evening light on the red sandstone is gorgeous.",
+    "rating": 4,
+    "author": "Divya T.",
+    "date": "2025-11-20"
+  },
+  {
+    "place": "Red Fort, Delhi",
+    "text": "Overcrowded and noisy. Hard to appreciate the architecture with so many selfie sticks everywhere. Visit early morning.",
+    "rating": 2,
+    "author": "Gaurav M.",
+    "date": "2025-09-28"
+  },
+
+  {
+    "place": "India Gate, Delhi",
+    "text": "India Gate is beautifully lit up at night. The lawns around it are perfect for an evening walk. Very peaceful and patriotic atmosphere.",
+    "rating": 5,
+    "author": "Aarti S.",
+    "date": "2025-01-26"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "A great place to visit with family on weekends. The ice cream vendors and the vibrant atmosphere make it a fun outing.",
+    "rating": 4,
+    "author": "Rohit K.",
+    "date": "2025-03-15"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Too crowded and chaotic on weekends. Vendors everywhere. Hard to find a good spot for photos. Better on weekday mornings.",
+    "rating": 2,
+    "author": "Megha P.",
+    "date": "2025-10-12"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "The Amar Jawan Jyoti flame is a moving tribute to soldiers. The entire Rajpath area is grand and impressive.",
+    "rating": 5,
+    "author": "Captain Raj N.",
+    "date": "2025-08-15"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Nice for a quick photo stop. Not much to do beyond that. The area around the gate is pleasant but limited in activities.",
+    "rating": 3,
+    "author": "Simran G.",
+    "date": "2025-04-20"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Summer evenings here are wonderful. The fountains and lighting create a beautiful ambiance. Street food nearby is excellent.",
+    "rating": 4,
+    "author": "Tanvi M.",
+    "date": "2025-05-30"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Perfect place for morning jogs and cycling. The wide roads around India Gate are ideal. Fresh air and beautiful surroundings.",
+    "rating": 5,
+    "author": "Akshay R.",
+    "date": "2025-02-10"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Visited on Republic Day. Security was tight but the parade was spectacular. A proud moment for every Indian.",
+    "rating": 5,
+    "author": "Deepa K.",
+    "date": "2025-01-26"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Pollution levels in Delhi can ruin the experience. On hazy days, you can barely see the gate from a distance. Check AQI before visiting.",
+    "rating": 2,
+    "author": "Nitin S.",
+    "date": "2025-11-08"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "The war memorial nearby is well-designed and informative. The area has been beautifully renovated. Clean and well-maintained.",
+    "rating": 4,
+    "author": "Prachi A.",
+    "date": "2025-12-05"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Rainy season visit was lovely. The lush green lawns with the illuminated gate in the background was stunning.",
+    "rating": 4,
+    "author": "Mohit D.",
+    "date": "2025-07-18"
+  },
+  {
+    "place": "India Gate, Delhi",
+    "text": "Good landmark but overhyped. It is essentially a war memorial you view from outside. Better to combine with other Delhi sights.",
+    "rating": 3,
+    "author": "Sunita V.",
+    "date": "2025-09-14"
+  },
+
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "The Qutub Minar complex is an incredible showcase of Indo-Islamic architecture. The iron pillar that never rusts is fascinating.",
+    "rating": 5,
+    "author": "Arvind M.",
+    "date": "2025-01-20"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "Beautiful ancient monument. The intricate carvings on the tower are remarkable. Good for history buffs and architecture lovers.",
+    "rating": 5,
+    "author": "Elena R.",
+    "date": "2025-11-10"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "You cannot go inside the Minar anymore due to safety concerns. Still worth visiting for the complex but slightly disappointing.",
+    "rating": 3,
+    "author": "Sanjay T.",
+    "date": "2025-04-05"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "The Alai Darwaza gateway is architecturally stunning. The entire UNESCO World Heritage complex deserves a slow, thoughtful visit.",
+    "rating": 5,
+    "author": "Meenakshi K.",
+    "date": "2025-12-22"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "Too hot in summer. Very little shade in the complex. Winter months are ideal. The surrounding park area is nice though.",
+    "rating": 2,
+    "author": "Ajay B.",
+    "date": "2025-06-15"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "Affordable entry fee. Well-maintained by ASI. The information boards provide good historical context about each structure.",
+    "rating": 4,
+    "author": "Shreya P.",
+    "date": "2025-02-18"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "The tallest brick minaret in the world! The engineering from 800 years ago is mind-blowing. Must visit for every tourist in Delhi.",
+    "rating": 5,
+    "author": "Michael C.",
+    "date": "2025-03-08"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "Crowded during school holidays. Many student groups make it noisy. The ruins around the main tower are interesting though.",
+    "rating": 3,
+    "author": "Pankaj L.",
+    "date": "2025-10-08"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "Evening visits are not recommended as it closes early. Morning light is best for photography. The lean of the tower is visible!",
+    "rating": 4,
+    "author": "Gayatri S.",
+    "date": "2025-11-30"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "A testimony to medieval Indian craftsmanship. Each storey has different architectural patterns. Simply magnificent.",
+    "rating": 5,
+    "author": "Raghav N.",
+    "date": "2025-01-05"
+  },
+  {
+    "place": "Qutub Minar, Delhi",
+    "text": "Not worth the travel if you are short on time in Delhi. Red Fort and India Gate are more impactful monuments to see.",
+    "rating": 2,
+    "author": "Usha D.",
+    "date": "2025-08-20"
+  },
+
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "The Ganga Aarti at Dashashwamedh Ghat is the most spiritual experience of my life. The chanting, flames, and river create magic.",
+    "rating": 5,
+    "author": "Shanti D.",
+    "date": "2025-11-01"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "Varanasi is raw, unfiltered India. The ghats are beautiful and chaotic. Early morning boat ride is absolutely essential.",
+    "rating": 5,
+    "author": "Marco P.",
+    "date": "2025-12-10"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "The city is dirty and overwhelming. Narrow lanes, aggressive touts, and the burning ghats are disturbing. Not for everyone.",
+    "rating": 2,
+    "author": "Rekha M.",
+    "date": "2025-07-05"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "Manikarnika Ghat is intense. Witnessing the cremation rituals gives a profound perspective on life and death in Hindu tradition.",
+    "rating": 4,
+    "author": "James O.",
+    "date": "2025-02-20"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "The sunrise boat ride on the Ganges was unforgettable. Seeing the ghats wake up with pilgrims and priests is deeply moving.",
+    "rating": 5,
+    "author": "Anjali R.",
+    "date": "2025-01-15"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "Visited during Dev Deepawali. The ghats lit with thousands of diyas was like a dream. Most beautiful thing I have ever seen.",
+    "rating": 5,
+    "author": "Ravi K.",
+    "date": "2025-11-15"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "Water quality of the Ganges is concerning. The pollution is visible. Despite this, the cultural significance is undeniable.",
+    "rating": 3,
+    "author": "Priyanka S.",
+    "date": "2025-06-18"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "Best lassi and street food in India! The lanes of Varanasi hide amazing food gems. Try the famous Kachori Gali.",
+    "rating": 4,
+    "author": "Vishal G.",
+    "date": "2025-03-25"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "Monsoon makes the ghats slippery and dangerous. The river level rises significantly. Summer heat is also brutal here.",
+    "rating": 2,
+    "author": "Anita L.",
+    "date": "2025-08-02"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "The silk weaving workshops are a hidden treasure. Banarasi silk sarees being made by hand is an art form worth witnessing.",
+    "rating": 4,
+    "author": "Fatima A.",
+    "date": "2025-10-30"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "The oldest living city in the world. Every corner has a story. A photographer's paradise despite the chaos. Must visit once.",
+    "rating": 5,
+    "author": "Sudhir B.",
+    "date": "2025-12-28"
+  },
+  {
+    "place": "Varanasi Ghats, Varanasi",
+    "text": "Terribly overcrowded during Shivratri. Could barely walk. But the devotional energy is infectious. A deeply spiritual city.",
+    "rating": 3,
+    "author": "Geeta N.",
+    "date": "2025-02-26"
+  },
+
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "The Gateway of India is iconic Mumbai. The view with the Taj Mahal Palace Hotel in the background is picture-perfect.",
+    "rating": 5,
+    "author": "Rahul S.",
+    "date": "2025-12-15"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "Great spot for an evening walk along the waterfront. The sea breeze and the lit-up gateway create a romantic atmosphere.",
+    "rating": 4,
+    "author": "Sakshi M.",
+    "date": "2025-01-20"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "Too many hawkers and photographers pressuring you to buy photos. The area around is not well maintained. Disappointing.",
+    "rating": 2,
+    "author": "Nikhil R.",
+    "date": "2025-05-10"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "The ferry ride to Elephanta Caves from here is wonderful. Gateway is a must-see but combine it with the caves for a full day.",
+    "rating": 4,
+    "author": "Anand P.",
+    "date": "2025-11-05"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "Visited at sunrise. Almost empty and incredibly peaceful. The arch against the morning sky is stunning. Highly recommend early visits.",
+    "rating": 5,
+    "author": "Komal T.",
+    "date": "2025-02-08"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "Mumbai monsoon made it impossible to enjoy. Heavy rain, waterlogging near the area. Not the season to visit coastal monuments.",
+    "rating": 1,
+    "author": "Varun D.",
+    "date": "2025-07-22"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "The historical significance of this monument as the last point the British left from India adds a powerful emotional layer.",
+    "rating": 5,
+    "author": "Prof. Sharma",
+    "date": "2025-08-15"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "Average tourist spot. Nothing much to do beyond clicking photos. 30 minutes is enough here. The surrounding Marine Drive is better.",
+    "rating": 3,
+    "author": "Pallavi K.",
+    "date": "2025-04-18"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "New Year celebrations here are legendary! The fireworks and crowd energy at midnight are electrifying. But expect extreme crowds.",
+    "rating": 4,
+    "author": "Aditya V.",
+    "date": "2025-01-01"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "The Indo-Saracenic architecture is beautiful. Well-preserved colonial era monument. Free entry makes it accessible to everyone.",
+    "rating": 4,
+    "author": "Lakshmi N.",
+    "date": "2025-03-12"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "Security checks are thorough which is reassuring. Clean area with good restroom facilities nearby. Well-managed tourist spot.",
+    "rating": 4,
+    "author": "Sunil B.",
+    "date": "2025-10-25"
+  },
+  {
+    "place": "Gateway of India, Mumbai",
+    "text": "The view from the water is even more spectacular. Take a short boat ride for the best perspective of the Gateway and skyline.",
+    "rating": 5,
+    "author": "Michelle L.",
+    "date": "2025-12-30"
+  },
+
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "One of the largest and oldest mosques in India. The architecture is grand and the atmosphere is deeply spiritual and peaceful.",
+    "rating": 5,
+    "author": "Ahmed K.",
+    "date": "2025-03-15"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "The bricks brought from Mecca make this mosque unique in the world. The massive courtyard can hold 10,000 worshippers.",
+    "rating": 5,
+    "author": "Fatima Z.",
+    "date": "2025-01-25"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "Non-Muslims cannot enter during prayer times. Check timings before visiting. The exterior architecture is impressive though.",
+    "rating": 3,
+    "author": "Ramesh G.",
+    "date": "2025-06-10"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "The granite pillars carved from single rocks are engineering marvels. Each pillar is a monolith! Qutb Shahi dynasty was remarkable.",
+    "rating": 5,
+    "author": "Imran S.",
+    "date": "2025-11-18"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "Located near Charminar, making it easy to visit both. The old city Hyderabad area has amazing Biryani joints nearby.",
+    "rating": 4,
+    "author": "Harish P.",
+    "date": "2025-02-28"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "Beautiful mosque but the surrounding area is very congested and noisy. Traffic and parking are nightmares. Take an auto.",
+    "rating": 3,
+    "author": "Sowmya R.",
+    "date": "2025-09-05"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "During Ramadan, the mosque comes alive with special prayers and community iftars. A wonderful cultural experience.",
+    "rating": 5,
+    "author": "Syed A.",
+    "date": "2025-03-20"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "The tombs of the Nizams within the compound are historically significant. Well-maintained by the Wakf Board.",
+    "rating": 4,
+    "author": "Naveen D.",
+    "date": "2025-10-12"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "Not much for non-religious tourists. The visit is quick. Better to combine with Charminar, Laad Bazaar for a full experience.",
+    "rating": 3,
+    "author": "Pradeep M.",
+    "date": "2025-05-22"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "Serene and calm atmosphere inside despite being in the heart of the bustling old city. The contrast is beautiful.",
+    "rating": 4,
+    "author": "Yasmeen B.",
+    "date": "2025-12-01"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "Photography inside is restricted during prayers. Respect the rules. The main hall with its enormous arches is breathtaking.",
+    "rating": 4,
+    "author": "Venkat L.",
+    "date": "2025-08-08"
+  },
+  {
+    "place": "Mecca Masjid, Hyderabad",
+    "text": "Visited during Eid. The festive atmosphere was incredible. Thousands gathered for prayers. A memorable cultural immersion.",
+    "rating": 5,
+    "author": "Zainab F.",
+    "date": "2025-03-31"
+  },
+
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "Sanchi Stupa is a hidden gem of India. The peace and serenity here is unmatched. The Buddhist sculptures are extraordinary.",
+    "rating": 5,
+    "author": "Akhil S.",
+    "date": "2025-11-20"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "UNESCO World Heritage Site that deserves more visitors. The toranas (gateways) have incredibly detailed carvings depicting Jataka tales.",
+    "rating": 5,
+    "author": "Dr. Banerjee",
+    "date": "2025-01-10"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "Remote location makes it hard to reach. Poor connectivity from Bhopal. The site itself is small and can be covered in 2 hours.",
+    "rating": 3,
+    "author": "Chetan K.",
+    "date": "2025-07-15"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "The Great Stupa is architecturally simple but profoundly spiritual. Emperor Ashoka's legacy is beautifully preserved here.",
+    "rating": 5,
+    "author": "Bhavana R.",
+    "date": "2025-12-05"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "Peaceful and uncrowded even on weekends. A welcome change from the chaos of popular monuments. Great for meditation.",
+    "rating": 5,
+    "author": "Monk Tenzin",
+    "date": "2025-02-14"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "The ASI museum at the site has excellent artifacts. Buddha relics found here are significant. Educational and well-presented.",
+    "rating": 4,
+    "author": "Nisha T.",
+    "date": "2025-10-08"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "Very hot in summer months. No shade on the hilltop. Carry water and sun protection. Winter is the best time to visit.",
+    "rating": 2,
+    "author": "Prakash V.",
+    "date": "2025-05-25"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "The carvings on the four gateways are some of the finest Buddhist art in the world. Each panel tells a story. Simply beautiful.",
+    "rating": 5,
+    "author": "Prof. Gupta",
+    "date": "2025-03-18"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "Lack of good restaurants and hotels nearby is a problem. The cafeteria at the site is basic. Plan meals in advance.",
+    "rating": 3,
+    "author": "Madhuri L.",
+    "date": "2025-08-30"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "Combining Sanchi with Udaygiri Caves makes for a perfect heritage day trip from Bhopal. Both are remarkable ancient sites.",
+    "rating": 4,
+    "author": "Tarun B.",
+    "date": "2025-11-12"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "The view from the hilltop is gorgeous. Lush green surroundings during monsoon. A spiritual haven for Buddhist pilgrims.",
+    "rating": 4,
+    "author": "Pema D.",
+    "date": "2025-09-10"
+  },
+  {
+    "place": "Sanchi Stupa, Madhya Pradesh",
+    "text": "Under-visited and under-appreciated. This 2300-year-old monument rivals any heritage site in the world. India should promote it more.",
+    "rating": 5,
+    "author": "Historian Rao",
+    "date": "2025-04-02"
+  }
+]

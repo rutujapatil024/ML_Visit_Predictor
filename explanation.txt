@@ -14,14 +14,15 @@ tourist recommendation application.
 decide the best time to visit famous Indian landmarks. Based on a user-selected date and 
 destination, the system predicts:
   * Crowd levels (Low, Moderate, High, Extreme)
-  * Average daily temperature (°C)
-  * Weather conditions (Sunny, Clear, Rainy, Cloudy)
+  * Predicted crowd count (actual visitor numbers via regression)
+  * Average daily temperature (C)
+  * Weather conditions (Sunny, Clear, Rainy, Cloudy) — live forecast or ML prediction
   * Landmark-specific peak season details
   * Indian holidays and festivals on that day
 
-Using these metrics, the system calculates a proprietary "Visit Score" (0–100) and
-returns a recommendation of YES, MAYBE, or NO, alongside customized travel tips
-and top 3 alternative dates in the next 60 days.
+Using these metrics, the system calculates a proprietary "Visit Score" (0-100) and
+returns a recommendation of YES, MAYBE, or NO, alongside customized travel tips,
+top 3 alternative dates in the next 60 days, and interactive crowd trend charts.
 
 --------------------------------------------------------------------------------
 2. DATASET DETAILS (data.xlsx)
@@ -47,7 +48,7 @@ The project utilizes historical observations in "data.xlsx":
     - Day_of_Week (Monday to Sunday)
     - Holiday (Yes / No)
     - Event (Regular Day, Festival, National Holiday, Cultural Event)
-    - Temperature (°C)
+    - Temperature (C)
     - Week_of_Year (0 to 52)
     - Special_Features
     - Region & Transportation_Type
@@ -89,44 +90,64 @@ To capture seasonality and calendar factors, the following features are generate
       - Extreme: >= 35,000 visitors
 
 --------------------------------------------------------------------------------
-5. MACHINE LEARNING MODELS
+5. MACHINE LEARNING MODELS & MULTI-MODEL ENSEMBLE
 --------------------------------------------------------------------------------
-Two Random Forest models and one statistical lookup table are trained and saved:
+The project implements a Multi-Model Ensemble setup for both classification (Crowd Level) 
+and regression (Crowd Count). In addition, it employs a Random Forest Regressor for 
+temperature prediction, and a statistical weather lookup table fallback.
 
-Model 1: Crowd Level Classifier (RandomForestClassifier)
-  * Target: Categorical crowd level ('Extreme', 'High', 'Low', 'Moderate')
-  * Algorithm: RandomForestClassifier (n_estimators=100, max_depth=10, random_state=42)
-  * Why Selected: Random Forests are robust to overfitting, handle mixed continuous/categorical
-    inputs natively, require no scaling of features, and capture complex interactions
-    (e.g., weekend + festival + place) very effectively.
-  * Features Used:
-    - place_enc, month, day_of_month, Week_of_Year, is_weekend, is_holiday, is_festival, event_enc
-  * Accuracy: ~66.4% on the test split (20% holdout).
-  * Feature Importances (as calculated by Gini Importance):
-    1. place_enc (~31.2%): The landmark itself is the strongest crowd predictor.
-    2. event_enc (~17.8%): Special events/festivals strongly dictate crowd size.
-    3. day_of_month (~17.7%): Monthly cycle fluctuations.
-    4. Week_of_Year (~14.4%): High resolution seasonal trend indicators.
-    5. month (~8.7%): Broader seasonal variations.
-    6. is_festival (~4.5%): Overlap festival flag.
-    7. is_weekend (~4.0%): Weekend leisure travel patterns.
-    8. is_holiday (~1.6%): National/local holiday overlap.
+A. Crowd Level Classifiers (Low, Moderate, High, Extreme)
+Three classifier models are trained and compared side-by-side:
+  1. Random Forest Classifier:
+     * Algorithm: RandomForestClassifier (n_estimators=100, max_depth=10, random_state=42)
+     * Performance: ~66.4% test split accuracy.
+     * Role: Primary model. Excellent generalization and handles features without scaling.
+  2. Decision Tree Classifier:
+     * Algorithm: DecisionTreeClassifier (max_depth=10, random_state=42)
+     * Performance: ~68.5% test split accuracy.
+     * Role: Alternative model, offering high interpretability and local split accuracy.
+  3. Gradient Boosting Classifier:
+     * Algorithm: GradientBoostingClassifier (n_estimators=50, max_depth=5, random_state=42)
+     * Performance: ~68.5% test split accuracy.
+     * Role: Alternative model, utilizing boosting to correct sequential errors.
 
-Model 2: Temperature Predictor (RandomForestRegressor)
-  * Target: Temperature in °C (Continuous variable)
+Feature Importances (as calculated by Gini Importance from the primary RF Classifier):
+  1. place_enc (~31.2%): The landmark itself is the strongest crowd predictor.
+  2. event_enc (~17.8%): Special events/festivals strongly dictate crowd size.
+  3. day_of_month (~17.7%): Monthly cycle fluctuations.
+  4. Week_of_Year (~14.4%): High resolution seasonal trend indicators.
+  5. month (~8.7%): Broader seasonal variations.
+  6. is_festival (~4.5%): Overlap festival flag.
+  7. is_weekend (~4.0%): Weekend leisure travel patterns.
+  8. is_holiday (~1.6%): National/local holiday overlap.
+
+B. Crowd Count Regressors (Granular predicted visitor numbers)
+Three regressor models are trained and compared side-by-side:
+  1. Random Forest Regressor:
+     * Algorithm: RandomForestRegressor (n_estimators=150, max_depth=12, random_state=42)
+     * Performance: MAE of ~2,750 visitors, R² Score ~0.76.
+     * Role: Primary regressor. High accuracy for mapping complex seasonal shapes.
+  2. Decision Tree Regressor:
+     * Algorithm: DecisionTreeRegressor (max_depth=12, random_state=42)
+     * Performance: MAE of ~3,656 visitors, R² Score ~0.61.
+     * Role: Alternative regressor.
+  3. Gradient Boosting Regressor:
+     * Algorithm: GradientBoostingRegressor (n_estimators=50, max_depth=5, random_state=42)
+     * Performance: MAE of ~2,918 visitors, R² Score ~0.74.
+     * Role: Alternative regressor.
+
+C. Temperature Predictor (RandomForestRegressor)
+  * Target: Average daily temperature in C (Continuous variable)
   * Algorithm: RandomForestRegressor (n_estimators=100, random_state=42)
-  * Why Selected: Excellent at modeling non-linear, step-wise temperature patterns across
-    different regions (e.g., winter in Delhi vs. Mumbai's tropical stability).
-  * Features Used: Same as Crowd Classifier.
-  * Performance: Mean Absolute Error (MAE) of ~4.8°C.
+  * Why Selected: Captures geographical temperature dynamics across northern vs. southern India.
+  * Performance: Mean Absolute Error (MAE) of ~4.8C.
 
-Model 3: Weather Forecast Lookup (Historical Mode Table)
+D. Weather Forecast Lookup (Historical Mode Table)
   * Target: Weather category ('Sunny', 'Clear', 'Rainy', 'Cloudy')
   * Implementation: A statistical mode (most frequent) lookup table keyed by (Place, Month).
-  * Why Selected: Weather transitions are cyclical but highly place-specific in India 
-    (monsoons, dry winters). Using the historical mode provides a highly reliable baseline
-    without risking model overfitting on sparse daily weather labels.
-  * Saved in: 'models/weather_lookup.pkl'.
+  * Note: Used as a fallback for predictions beyond 16 days. For dates within 16 days, 
+    the system queries the live Open-Meteo API.
+
 
 --------------------------------------------------------------------------------
 6. APP PREDICTION & RECOMMENDATION ENGINE (app.py)
@@ -139,8 +160,14 @@ When a user queries a landmark and date, the backend performs the following step
    Indian Public Holidays & Festivals (spanning 2025 and 2026, e.g., Republic Day, Holi,
    Diwali, Christmas) and seasonal windows (e.g., Dussehra/Diwali season, Republic Day 
    long weekend).
-3. ML Execution: Calls the saved Random Forest models to predict Crowd Level and Temperature.
-4. Weather Extraction: Looks up the weather for that place and month in the weather lookup table.
+3. ML Execution: Calls the saved Random Forest models to predict:
+   - Crowd Level (classification)
+   - Crowd Count (regression — actual predicted visitor numbers)
+   - Temperature (regression)
+4. Weather Resolution:
+   - For dates within 16 days: Fetches LIVE weather from Open-Meteo API (see Section 9).
+   - For dates beyond 16 days: Falls back to ML weather lookup table.
+   - Response includes a "weather_source" field indicating "Live Forecast" or "ML Prediction".
 5. Visit Score Calculation (0 - 100):
    * Base Score: Determined by the predicted crowd level:
      - Low: 90
@@ -153,9 +180,9 @@ When a user queries a landmark and date, the backend performs the following step
      - Cloudy: -3 (moderate visibility)
      - Clear: 0 (optimal)
    * Temperature Penalty:
-     - Temp > 38°C: -12 (risk of heatstroke/dehydration)
-     - Temp > 36°C: -8 (heavy discomfort)
-     - Temp <= 36°C: 0
+     - Temp > 38C: -12 (risk of heatstroke/dehydration)
+     - Temp > 36C: -8 (heavy discomfort)
+     - Temp <= 36C: 0
    * Natural Jitter: A deterministic pseudo-random hash noise of -5 to +5 is added based 
      on the date string to reflect real-world natural fluctuation on adjacent dates.
    * Clamped: The final score is bound between 0 and 100.
@@ -167,7 +194,7 @@ When a user queries a landmark and date, the backend performs the following step
    * Backend automatically runs the prediction pipeline for the next 60 days.
    * Returns the top 3 dates with the highest overall Visit Score.
 8. Contextual Travel Tips:
-   * Extreme Heat warning (Temp >= 38°C): limit exposure, carry hydration.
+   * Extreme Heat warning (Temp >= 38C): limit exposure, carry hydration.
    * Rain (Rainy): Bring umbrellas, caution on slippery stone steps.
    * Crowds (High/Extreme): Book tickets online to avoid queue, arrive before 8:00 AM.
    * Low Crowds: Enjoy a peaceful, relaxed visit.
@@ -179,19 +206,74 @@ The frontend dashboard is designed as a single-page web app using Flask:
   * Backend API:
     - GET '/' : Renders the home template with landmark selections.
     - POST '/predict' : Accepts JSON {place, date} and returns crowd prediction,
-      score, temperature, weather, tips, holiday details, and better alternative dates.
+      score, temperature, weather, tips, holiday details, and better dates.
     - POST '/compare' : Accepts JSON {places, date} (2 or 3 landmarks) and returns
       a comparative breakdown, flagging the absolute best destination with an "is_best" key.
+    - POST '/chart-data' : Accepts JSON {place, date} and returns monthly crowd trend
+      data for Chart.js visualization (dates, crowd counts, temperatures, levels).
   * UI/UX Aesthetics:
     - Dark-mode primary design with glassmorphism panels.
     - Vibrantly color-coded badges matching recommendation states (Green for YES,
       Orange for MAYBE, Red for NO).
     - Circular SVG progress indicators showing the Visit Score.
+    - Interactive Chart.js bar/line chart showing monthly crowd trends with temperature overlay.
+    - Weather source badge indicating "Live Forecast" or "ML Prediction".
     - Highly responsive layout adapting gracefully to mobile, tablet, and desktop screens.
     - Integrated Landmark Comparison Drawer to contrast weather, temperature, and crowds.
 
 --------------------------------------------------------------------------------
-8. HOW TO RUN THE PROJECT
+8. WEATHER API INTEGRATION (Open-Meteo)
+--------------------------------------------------------------------------------
+The application integrates live weather forecasts from the Open-Meteo API:
+
+  * API: Open-Meteo (https://open-meteo.com/) — Free, no API key required
+  * Coverage: 16-day weather forecasts for any global coordinate
+
+  * Implementation:
+    - Each landmark has stored GPS coordinates (latitude, longitude)
+    - For dates within 16 days from today: Live API call fetches real forecast data
+    - For dates beyond 16 days: Falls back to ML weather lookup + temperature model
+    - API returns: daily max/min temperature, WMO weather code
+
+  * WMO Weather Code Mapping:
+    - Codes 0-1: Clear
+    - Codes 2-3, 45-48, 71-77, 85-86: Cloudy
+    - Codes 51-67, 80-82, 95-99: Rainy
+    - Temperature is computed as average of daily max and min
+
+  * Error Handling: If API call fails (timeout, network error), gracefully falls back
+    to ML prediction without disrupting the user experience.
+
+  * User Indicator: A badge ("Live Forecast" or "ML Prediction") is shown in the
+    weather section so users know the data source.
+
+--------------------------------------------------------------------------------
+9. INTERACTIVE ANALYSIS CHARTS (Chart.js)
+--------------------------------------------------------------------------------
+The application includes interactive monthly crowd trend and hourly density curves:
+
+A. Monthly Trends Chart
+  * Technology: Chart.js v4.4.4 (CDN-loaded)
+  * Data: Generated by the '/chart-data' backend endpoint
+  * Chart Type: Combined bar + line chart
+    - Bars: Predicted crowd count per day, color-coded by crowd level
+      (Green=Low, Yellow=Moderate, Orange=High, Red=Extreme)
+    - Line: Temperature overlay on secondary Y-axis (orange color)
+    - Selected date is highlighted with a gold border on its bar
+  * Interactivity: Hover tooltips showing date, crowd level, visitor count, temperature, and score.
+
+B. Hourly Distribution Curves
+  * Data: Generated dynamically in the `/predict` endpoint using landmark-specific
+    operating hours and peak/off-peak density weights.
+  * Hourly Intervals: 6:00 AM, 8:00 AM, 10:00 AM, 12:00 PM, 2:00 PM, 4:00 PM, 6:00 PM, 8:00 PM.
+  * Chart Type: Line chart with filled area underneath
+    - Area Line: Expected crowd density (visitor distribution count)
+    - Line: Expected hourly temperature variation (coolest mornings, peak mid-afternoon heat)
+  * Optimal Visit Time: Calculates the single hour matching the lowest relative crowd count 
+    and coolest temperature window (e.g. 6:00 AM or 8:00 AM for outdoor monuments).
+
+--------------------------------------------------------------------------------
+10. HOW TO RUN THE PROJECT
 --------------------------------------------------------------------------------
 1. Install Dependencies:
    pip install -r requirements.txt
