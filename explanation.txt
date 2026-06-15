@@ -213,12 +213,15 @@ The frontend dashboard is designed as a single-page web app using Flask:
       data for Chart.js visualization (dates, crowd counts, temperatures, levels).
   * UI/UX Aesthetics:
     - Dark-mode primary design with glassmorphism panels.
-    - Vibrantly color-coded badges matching recommendation states (Green for YES,
-      Orange for MAYBE, Red for NO).
+    - Split-screen results layout presenting a high-resolution landmark image banner 
+      alongside the color-coded recommendation verdict card.
+    - Horizontal side-by-side Multi-Model Ensemble cards displaying predictions and metrics in parallel.
+    - Visual landmark comparison cards featuring postcard-quality thumbnail images with hover scale zoom effects.
+    - Vibrantly color-coded badges matching recommendation states (Green for YES, Orange for MAYBE, Red for NO).
     - Circular SVG progress indicators showing the Visit Score.
     - Interactive Chart.js bar/line chart showing monthly crowd trends with temperature overlay.
     - Weather source badge indicating "Live Forecast" or "ML Prediction".
-    - Highly responsive layout adapting gracefully to mobile, tablet, and desktop screens.
+    - Highly responsive layout adapting gracefully to mobile (collapsing to vertical columns) and desktop.
     - Integrated Landmark Comparison Drawer to contrast weather, temperature, and crowds.
 
 --------------------------------------------------------------------------------

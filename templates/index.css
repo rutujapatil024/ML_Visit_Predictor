@@ -269,7 +269,7 @@ h4 {
 }
 
 .results-section {
-    max-width: 720px;
+    max-width: 1050px;
     margin: 0 auto;
     padding: 0 20px 60px;
     display: none
@@ -292,14 +292,62 @@ h4 {
     }
 }
 
+.results-main-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.landmark-banner-container {
+    width: 100%;
+    height: 100%;
+    min-height: 280px;
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.landmark-banner-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.85;
+    transition: transform 0.5s ease;
+}
+
+.landmark-banner-container:hover .landmark-banner-img {
+    transform: scale(1.03);
+}
+
+.landmark-banner-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 30px 24px 20px;
+    background: linear-gradient(to top, rgba(15, 10, 0, 0.95) 0%, rgba(15, 10, 0, 0.4) 60%, transparent 100%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+}
+
+.landmark-banner-title {
+    font-family: 'Cinzel', serif;
+    font-size: 2.2rem;
+    color: var(--gold);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
 .verdict-card {
     border-radius: 16px;
     padding: 40px 30px;
     text-align: center;
-    margin-bottom: 30px;
     border: 1px solid var(--border);
     position: relative;
-    overflow: hidden
+    overflow: hidden;
+    margin-bottom: 0;
 }
 
 .verdict-card.yes {
@@ -916,6 +964,26 @@ footer p {
     transform: translateY(-5px);
 }
 
+.compare-dest-image-container {
+    width: 100%;
+    height: 200px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 12px 0 16px;
+    border: 1px solid var(--border);
+}
+
+.compare-dest-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s ease;
+}
+
+.compare-column:hover .compare-dest-image {
+    transform: scale(1.05);
+}
+
 .compare-column.best-choice {
     border-color: var(--gold);
     box-shadow: 0 10px 30px rgba(212, 160, 23, 0.1);
@@ -1115,6 +1183,7 @@ footer p {
 
 /* Ensemble Visualizer Section */
 .ensemble-visualizer {
+    grid-column: span 2;
     margin-top: 40px;
     border-top: 1px solid var(--border);
     padding-top: 40px;
@@ -1238,6 +1307,24 @@ footer p {
    ═══════════════════════════════════════════════════ */
 
 @media(max-width:700px) {
+    .results-main-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .landmark-banner-container {
+        min-height: 180px;
+        height: 200px;
+    }
+
+    .landmark-banner-title {
+        font-size: 1.6rem;
+    }
+
+    .ensemble-visualizer {
+        grid-column: span 1;
+    }
+
     .details-grid {
         grid-template-columns: 1fr
     }

@@ -98,18 +98,26 @@
 
     <!-- RESULTS -->
     <section class="results-section" id="resultsSection">
-        <div class="verdict-card" id="verdictCard">
-            <div class="verdict-emoji" id="verdictEmoji"></div>
-            <div class="verdict-text" id="verdictText"></div>
-            <div class="verdict-sub" id="verdictSub"></div>
-            <div class="score-ring"><svg viewBox="0 0 160 160">
-                    <circle class="bg" cx="80" cy="80" r="68" />
-                    <circle class="fill" id="scoreFill" cx="80" cy="80" r="68" />
-                </svg>
-                <div class="score-value" id="scoreValue">0</div>
+        <div class="results-main-grid">
+            <div class="landmark-banner-container" id="landmarkBannerContainer">
+                <img src="" id="landmarkBannerImg" alt="Landmark Banner" class="landmark-banner-img">
+                <div class="landmark-banner-overlay">
+                    <h2 class="landmark-banner-title" id="landmarkBannerTitle"></h2>
+                </div>
             </div>
-            <div class="score-label">Visit Score</div>
-            <div class="place-date-display" id="placeDate"></div>
+            <div class="verdict-card" id="verdictCard">
+                <div class="verdict-emoji" id="verdictEmoji"></div>
+                <div class="verdict-text" id="verdictText"></div>
+                <div class="verdict-sub" id="verdictSub"></div>
+                <div class="score-ring"><svg viewBox="0 0 160 160">
+                        <circle class="bg" cx="80" cy="80" r="68" />
+                        <circle class="fill" id="scoreFill" cx="80" cy="80" r="68" />
+                    </svg>
+                    <div class="score-value" id="scoreValue">0</div>
+                </div>
+                <div class="score-label">Visit Score</div>
+                <div class="place-date-display" id="placeDate"></div>
+            </div>
         </div>
         <div class="details-grid" id="detailsGrid">
             <div class="detail-card">
@@ -326,6 +334,21 @@
         /* Crowd badge class mapper */
         function crowdClass(l) { return 'badge badge-' + l.toLowerCase() }
 
+        /* Map landmark name to image filename key */
+        function getLandmarkImageKey(place) {
+            const map = {
+                "Taj Mahal, Agra": "taj_mahal",
+                "Red Fort, Delhi": "red_fort",
+                "India Gate, Delhi": "india_gate",
+                "Qutub Minar, Delhi": "qutub_minar",
+                "Varanasi Ghats, Varanasi": "varanasi_ghats",
+                "Gateway of India, Mumbai": "gateway_of_india",
+                "Mecca Masjid, Hyderabad": "mecca_masjid",
+                "Sanchi Stupa, Madhya Pradesh": "sanchi_stupa"
+            };
+            return map[place] || "taj_mahal";
+        }
+
         /* Format date nicely */
         function fmtDate(ds) { const d = new Date(ds + 'T00:00:00'); return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }) }
 
@@ -452,6 +475,13 @@
         function renderResults(d, place, date) {
             // Hide compare results
             document.getElementById('compareResultsSection').classList.remove('visible');
+
+            // Render landmark banner
+            const bannerImg = document.getElementById('landmarkBannerImg');
+            const bannerTitle = document.getElementById('landmarkBannerTitle');
+            const imageKey = getLandmarkImageKey(place);
+            bannerImg.src = `/static/images/${imageKey}.png`;
+            bannerTitle.textContent = place.split(',')[0];
 
             const rs = document.getElementById('resultsSection');
             const vc = document.getElementById('verdictCard');
@@ -816,6 +846,9 @@
                 col.innerHTML = `
                     ${bestBadge}
                     <div class="compare-dest-name">${d.place.split(',')[0]}</div>
+                    <div class="compare-dest-image-container">
+                        <img src="/static/images/${getLandmarkImageKey(d.place)}.png" class="compare-dest-image" alt="${d.place}">
+                    </div>
                     <div class="compare-verdict-badge ${rec}">${d.recommendation} — ${d.recommendation === 'YES' ? 'Recommended' : d.recommendation === 'MAYBE' ? 'Busy' : 'Avoid'}</div>
                     
                     <div class="score-ring" style="width:110px; height:110px;">
