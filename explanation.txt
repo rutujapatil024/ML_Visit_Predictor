@@ -4,8 +4,8 @@
 ================================================================================
 
 This document provides a comprehensive explanation of the architecture, data pipeline,
-machine learning models, backend logic, and frontend design of the "Should I Visit?" 
-tourist recommendation application.
+machine learning models, backend logic, user authentication system, and frontend design 
+of the "Should I Visit?" tourist recommendation application.
 
 --------------------------------------------------------------------------------
 1. PROJECT OVERVIEW & OBJECTIVE
@@ -15,14 +15,16 @@ decide the best time to visit famous Indian landmarks. Based on a user-selected 
 destination, the system predicts:
   * Crowd levels (Low, Moderate, High, Extreme)
   * Predicted crowd count (actual visitor numbers via regression)
-  * Average daily temperature (C)
+  * Real-Time User Confirmed Intent (blended with ML baseline)
+  * Average daily temperature (°C)
   * Weather conditions (Sunny, Clear, Rainy, Cloudy) — live forecast or ML prediction
   * Landmark-specific peak season details
   * Indian holidays and festivals on that day
 
 Using these metrics, the system calculates a proprietary "Visit Score" (0-100) and
 returns a recommendation of YES, MAYBE, or NO, alongside customized travel tips,
-top 3 alternative dates in the next 60 days, and interactive crowd trend charts.
+top 3 alternative dates in the next 60 days, real-time user intent breakdown, and
+interactive crowd trend charts.
 
 --------------------------------------------------------------------------------
 2. DATASET DETAILS (data.xlsx)
@@ -48,7 +50,7 @@ The project utilizes historical observations in "data.xlsx":
     - Day_of_Week (Monday to Sunday)
     - Holiday (Yes / No)
     - Event (Regular Day, Festival, National Holiday, Cultural Event)
-    - Temperature (C)
+    - Temperature (°C)
     - Week_of_Year (0 to 52)
     - Special_Features
     - Region & Transportation_Type
@@ -137,17 +139,16 @@ Three regressor models are trained and compared side-by-side:
      * Role: Alternative regressor.
 
 C. Temperature Predictor (RandomForestRegressor)
-  * Target: Average daily temperature in C (Continuous variable)
+  * Target: Average daily temperature in °C (Continuous variable)
   * Algorithm: RandomForestRegressor (n_estimators=100, random_state=42)
   * Why Selected: Captures geographical temperature dynamics across northern vs. southern India.
-  * Performance: Mean Absolute Error (MAE) of ~4.8C.
+  * Performance: Mean Absolute Error (MAE) of ~4.8°C.
 
 D. Weather Forecast Lookup (Historical Mode Table)
   * Target: Weather category ('Sunny', 'Clear', 'Rainy', 'Cloudy')
   * Implementation: A statistical mode (most frequent) lookup table keyed by (Place, Month).
   * Note: Used as a fallback for predictions beyond 16 days. For dates within 16 days, 
     the system queries the live Open-Meteo API.
-
 
 --------------------------------------------------------------------------------
 6. APP PREDICTION & RECOMMENDATION ENGINE (app.py)
@@ -157,17 +158,19 @@ When a user queries a landmark and date, the backend performs the following step
 1. Feature Extraction: Parses the queried date to compute day_of_month, month, is_weekend,
    week_of_year, event_type, is_festival, and is_holiday.
 2. Holiday/Festival Enrichment: Fetches holidays DYNAMICALLY from the Python 'holidays'
-   library + Nager.Date API. Data is cached per-year in memory. This replaces the old
-   hardcoded INDIAN_HOLIDAYS dictionary and works for ANY future year automatically.
+   library + Nager.Date API (with resilient try-except fallback). Data is cached per-year in memory.
+   This replaces the old hardcoded INDIAN_HOLIDAYS dictionary and works for ANY future year automatically.
 3. ML Execution: Calls the saved Random Forest models to predict:
    - Crowd Level (classification)
    - Crowd Count (regression — actual predicted visitor numbers)
    - Temperature (regression)
-4. Confirmed Visitor Blending (NEW):
-   - Queries the SQLite database for confirmed visitors for this place + date.
+   Feature input arrays are passed as pandas DataFrames with explicit column names to eliminate scikit-learn warnings.
+4. Confirmed Visitor Blending (Real-Time User Integration):
+   - Queries the SQLite database (`visitors.db`) for confirmed visitors for this place + date.
+   - Retrieves total confirmed visitor count as well as individual usernames (e.g. `['rahul_traveler', 'priya']`).
    - Blends ML prediction with real-time confirmed data using the formula:
      final_count = (ML_WEIGHT * ml_count) + ((1 - ML_WEIGHT) * confirmed_count * SCALE)
-   - ML_WEIGHT = 0.6 (60% ML, 40% live confirmed data)
+   - ML_WEIGHT = 0.6 (60% ML baseline, 40% live confirmed data)
    - CONFIRMED_VISITOR_SCALE = 50 (each confirmed user represents ~50 actual visitors)
    - The blended count is always at least the estimated real visitors.
 5. Weather Resolution:
@@ -186,9 +189,9 @@ When a user queries a landmark and date, the backend performs the following step
      - Cloudy: -3 (moderate visibility)
      - Clear: 0 (optimal)
    * Temperature Penalty:
-     - Temp > 38C: -12 (risk of heatstroke/dehydration)
-     - Temp > 36C: -8 (heavy discomfort)
-     - Temp <= 36C: 0
+     - Temp > 38°C: -12 (risk of heatstroke/dehydration)
+     - Temp > 36°C: -8 (heavy discomfort)
+     - Temp <= 36°C: 0
    * Natural Jitter: A deterministic pseudo-random hash noise of -5 to +5 is added based 
      on the date string to reflect real-world natural fluctuation on adjacent dates.
    * Clamped: The final score is bound between 0 and 100.
@@ -200,47 +203,56 @@ When a user queries a landmark and date, the backend performs the following step
    * Backend automatically runs the prediction pipeline for the next 60 days.
    * Returns the top 3 dates with the highest overall Visit Score.
 9. Contextual Travel Tips:
-   * Extreme Heat warning (Temp >= 38C): limit exposure, carry hydration.
+   * Extreme Heat warning (Temp >= 38°C): limit exposure, carry hydration.
    * Rain (Rainy): Bring umbrellas, caution on slippery stone steps.
    * Crowds (High/Extreme): Book tickets online to avoid queue, arrive before 8:00 AM.
    * Low Crowds: Enjoy a peaceful, relaxed visit.
 
 --------------------------------------------------------------------------------
-7. FLASK WEB APPLICATION STRUCTURE
+7. FLASK WEB APPLICATION & USER AUTHENTICATION
 --------------------------------------------------------------------------------
 The frontend dashboard is designed as a single-page web app using Flask:
-  * Backend API:
-    - GET '/' : Renders the home template with landmark selections.
-    - POST '/predict' : Accepts JSON {place, date, session_id} and returns crowd
+
+  * User Registration & Authentication (New):
+    - Secure account registration (`POST /register`) and login (`POST /login`)
+    - Passwords stored as PBKDF2/SHA256 hashes via `werkzeug.security`
+    - Accounts stored in SQLite (`visitors.db`) table `users`
+    - Top navigation bar displays current user badge (e.g. `rahul_traveler`) or Sign In / Sign Up button
+    - Glassmorphism authentication modal overlay with tabbed forms for Sign In & Create Account
+    - Session state saved in browser `localStorage` and automatically restored on load
+
+  * Backend API Endpoints:
+    - GET '/' : Renders the home template with landmark selections and user auth state.
+    - POST '/register' : Creates a new user account (username, email, password).
+    - POST '/login' : Authenticates user with username/email and password.
+    - POST '/current-user' : Fetches active user profile by ID.
+    - POST '/predict' : Accepts JSON {place, date, session_id, user_id?} and returns crowd
       prediction, score, temperature, weather, tips, holiday details, confirmed
-      visitors data, blended predictions, and better dates.
+      visitors count, confirmed usernames list, blended predictions, and better dates.
     - POST '/compare' : Accepts JSON {places, date} (2 or 3 landmarks) and returns
       a comparative breakdown, flagging the absolute best destination with an "is_best" key.
     - POST '/chart-data' : Accepts JSON {place, date} and returns monthly crowd trend
       data for Chart.js visualization (dates, crowd counts, temperatures, levels).
-    - POST '/confirm-visit' : Accepts JSON {place, date, session_id} and stores a
-      confirmed visit in the SQLite database. Returns updated confirmed count.
-    - POST '/cancel-visit' : Accepts JSON {place, date, session_id} and removes a
+    - POST '/confirm-visit' : Requires authentication. Accepts JSON {place, date, session_id, user_id, username}
+      and stores a confirmed visit in SQLite. Returns updated confirmed count and usernames list.
+    - POST '/cancel-visit' : Accepts JSON {place, date, session_id, user_id} and removes a
       confirmed visit. Returns updated confirmed count.
     - POST '/live-stats' : Accepts JSON {date, place?} and returns real-time confirmed
-      visitor counts for one or all places on that date.
+      visitor counts and usernames for one or all places on that date.
     - POST '/holidays' : Accepts JSON {year} and returns dynamically fetched holiday
       data for the requested year from the holidays library + Nager.Date API.
+
   * UI/UX Aesthetics:
     - Dark-mode primary design with glassmorphism panels.
-    - Split-screen results layout presenting a high-resolution landmark image banner 
-      alongside the color-coded recommendation verdict card.
+    - Top Sticky Navigation bar with Brand title and User Profile Badge / Auth trigger.
+    - Split-screen results layout presenting a landmark image banner alongside the verdict card.
     - Horizontal side-by-side Multi-Model Ensemble cards displaying predictions and metrics in parallel.
-    - Visual landmark comparison cards featuring postcard-quality thumbnail images with hover scale zoom effects.
-    - Vibrantly color-coded badges matching recommendation states (Green for YES, Orange for MAYBE, Red for NO).
+    - Color-coded badges matching recommendation states (Green for YES, Orange for MAYBE, Red for NO).
     - Circular SVG progress indicators showing the Visit Score.
     - Interactive Chart.js bar/line chart showing monthly crowd trends with temperature overlay.
-    - Weather source badge indicating "Live Forecast" or "ML Prediction".
-    - Confirmed visitor counter with live pulsing green dot indicator.
-    - "I'm Planning to Visit" confirmation button with toggle between confirm/cancel states.
-    - Prediction source breakdown bar showing ML vs confirmed data blend.
-    - Highly responsive layout adapting gracefully to mobile (collapsing to vertical columns) and desktop.
-    - Integrated Landmark Comparison Drawer to contrast weather, temperature, and crowds.
+    - Confirmed visitor counter with live green indicator and list of confirmed real usernames.
+    - "Planning to Visit? / I'm Visiting" confirmation card requiring user login (prompts modal if guest).
+    - Prediction source breakdown bar displaying `🔄 ML + Real-Time Live Users` vs `🤖 ML Prediction Only`.
 
 --------------------------------------------------------------------------------
 8. WEATHER API INTEGRATION (Open-Meteo)
@@ -294,14 +306,14 @@ B. Hourly Distribution Curves
     and coolest temperature window (e.g. 6:00 AM or 8:00 AM for outdoor monuments).
 
 --------------------------------------------------------------------------------
-10. LIVE CALENDAR INTEGRATION
+10. DYNAMIC LIVE CALENDAR INTEGRATION
 --------------------------------------------------------------------------------
 The application fetches Indian holidays and festivals dynamically using two sources:
 
   * Primary: Python 'holidays' library (v0.40+)
     - Supports India (country code 'IN') with government holidays.
     - Automatically calculates dates for any year (no hardcoding needed).
-    - Works offline without API keys.
+    - Includes resilient fallback logic (`try...except ImportError`) for environments without the module.
 
   * Supplementary: Nager.Date API (free, no key required)
     - URL: https://date.nager.at/api/v3/PublicHolidays/{year}/IN
@@ -316,41 +328,32 @@ The application fetches Indian holidays and festivals dynamically using two sour
   * Caching:
     - Holiday data is cached in-memory per year on first access.
     - Pre-warms cache for current year and next year at app startup.
-    - Festival season windows (approximate busy-period ranges) remain as static
-      data since they represent general patterns, not exact dates.
 
 --------------------------------------------------------------------------------
-11. CONFIRMED VISITOR TRACKING SYSTEM
+11. CONFIRMED VISITOR TRACKING & USER ACCOUNT SYSTEM
 --------------------------------------------------------------------------------
-The application includes a real-time confirmed visitor system:
+The application includes a real-time user-linked visitor tracking system:
 
-  * Storage: SQLite database (visitors.db)
-    - Table: confirmed_visits (id, place, date, session_id, created_at)
-    - Unique constraint on (place, date, session_id) prevents duplicates.
-    - Auto-created on first app startup.
+  * Database Storage: SQLite (`visitors.db`)
+    - Table `users`: `id`, `username` (UNIQUE), `email` (UNIQUE), `password_hash`, `created_at`
+    - Table `confirmed_visits`: `id`, `place`, `date`, `session_id`, `user_id`, `username`, `created_at`
+    - Schema auto-initializes on startup with migration checks (`PRAGMA table_info`).
 
-  * Session Management:
-    - Each browser gets a persistent session ID stored in localStorage.
-    - Format: 'sess_{timestamp}_{random}'
-    - Ensures one confirmation per user per place-date.
+  * Authentication Requirement:
+    - Guests can view all predictions, charts, and forecasts.
+    - Clicking "✅ I'm Visiting" requires sign-in. Guests are presented with the Sign In / Sign Up modal.
+    - Once logged in, confirmations store the user's ID and username in SQLite.
+
+  * Displaying Confirmed Visitors:
+    - Live card displays total confirmed count + list of confirmed usernames (e.g., `👥 Confirmed Real Users: rahul_traveler, priya`).
+    - Source bar displays `🔄 ML + Real-Time Live Users` badge with breakdown of ML count, confirmed count, and user list.
 
   * Blending Formula:
     - When confirmed visitors exist:
-      final = (0.6 * ML_predicted) + (0.4 * confirmed * 50)
-    - Scale factor of 50: each confirmed user represents ~50 actual visitors.
+      final_count = (0.6 * ML_predicted) + (0.4 * confirmed_visitors * 50)
+    - Scale factor of 50: each confirmed user represents ~50 actual visitors in real-world scaling.
     - Floor: blended count is always >= estimated real visitors.
-    - When no confirmed visitors: ML prediction returned as-is.
-
-  * API Endpoints:
-    - POST /confirm-visit: Store a confirmed visit
-    - POST /cancel-visit: Remove a confirmed visit
-    - POST /live-stats: Get confirmed counts for a date
-
-  * Frontend:
-    - Green pulsing "Live Confirmed" indicator on crowd card.
-    - "I'm Visiting" / "Cancel My Visit" toggle button.
-    - Prediction source bar showing: ML count, confirmed count, adjusted total.
-    - Automatic re-prediction after confirming/cancelling.
+    - When no confirmed visitors: returns 100% ML prediction (`🤖 ML Prediction Only`).
 
 --------------------------------------------------------------------------------
 12. HOW TO RUN THE PROJECT
