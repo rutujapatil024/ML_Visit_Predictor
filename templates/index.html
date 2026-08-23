@@ -16,6 +16,57 @@
 
 
 <body>
+    <!-- TOP NAVIGATION & AUTH BAR -->
+    <nav class="top-nav">
+        <div class="app-brand">🏛️ <span>Should I Visit?</span></div>
+        <div class="user-auth-area" id="authNavArea">
+            <button class="auth-nav-btn" onclick="openAuthModal('login')">🔑 Sign In / Sign Up</button>
+        </div>
+    </nav>
+
+    <!-- AUTH MODAL -->
+    <div class="auth-modal-overlay" id="authModal" onclick="closeAuthModal(event)">
+        <div class="auth-modal-card" onclick="event.stopPropagation()">
+            <button class="modal-close-btn" onclick="closeAuthModal()">&times;</button>
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" id="loginTabBtn" onclick="switchAuthTab('login')">Sign In</button>
+                <button class="auth-tab-btn" id="signupTabBtn" onclick="switchAuthTab('signup')">Create Account</button>
+            </div>
+
+            <!-- Sign In Form -->
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="auth-field">
+                    <label for="loginId">Username or Email</label>
+                    <input type="text" id="loginId" placeholder="e.g. alex or alex@example.com" required>
+                </div>
+                <div class="auth-field">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="auth-submit-btn" id="loginSubmitBtn">Sign In</button>
+            </form>
+
+            <!-- Create Account Form -->
+            <form id="signupForm" style="display:none" onsubmit="handleSignup(event)">
+                <div class="auth-field">
+                    <label for="signupUsername">Username</label>
+                    <input type="text" id="signupUsername" placeholder="e.g. alex" required minlength="3">
+                </div>
+                <div class="auth-field">
+                    <label for="signupEmail">Email Address</label>
+                    <input type="email" id="signupEmail" placeholder="e.g. alex@example.com" required>
+                </div>
+                <div class="auth-field">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" placeholder="Minimum 6 characters" required minlength="6">
+                </div>
+                <button type="submit" class="auth-submit-btn" id="signupSubmitBtn">Create Account</button>
+            </form>
+
+            <div class="auth-error-msg" id="authErrorMsg"></div>
+        </div>
+    </div>
+
     <!-- HERO -->
     <section class="hero">
         <div class="mandala"><svg viewBox="0 0 200 200">
@@ -126,6 +177,10 @@
                 <div class="detail-value" id="crowdBadge"></div>
                 <div class="detail-sub" id="crowdCount"></div>
                 <div class="detail-sub crowd-predicted" id="crowdPredicted"></div>
+                <div class="confirmed-visitors-display" id="confirmedDisplay" style="display:none">
+                    <div class="live-indicator"><span class="live-dot"></span> Live Confirmed</div>
+                    <div class="confirmed-count" id="confirmedCount">0 visitors confirmed</div>
+                </div>
             </div>
             <div class="detail-card">
                 <div class="detail-icon" id="weatherIcon">☀️</div>
@@ -151,6 +206,28 @@
                 <div class="detail-value" id="scoreText"></div>
                 <div class="detail-sub" id="scoreAdvice"></div>
             </div>
+            <!-- CONFIRM VISIT CARD -->
+            <div class="confirm-visit-card" id="confirmVisitCard" style="display:none">
+                <div class="confirm-visit-inner">
+                    <div class="confirm-visit-left">
+                        <div class="confirm-icon">🙋</div>
+                        <div class="confirm-text">
+                            <h4>Planning to Visit?</h4>
+                            <p>Confirm your visit to help others get better crowd predictions</p>
+                        </div>
+                    </div>
+                    <div class="confirm-visit-right">
+                        <button class="confirm-btn" id="confirmBtn" onclick="toggleConfirmVisit()">
+                            <span id="confirmBtnText">✅ I'm Visiting</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="prediction-source-bar" id="predictionSourceBar" style="display:none">
+                    <div class="source-badge" id="predSourceBadge">📊 ML Prediction</div>
+                    <div class="source-breakdown" id="sourceBreakdown"></div>
+                </div>
+            </div>
+
             <div class="tips-wide-card" id="tipsCard" style="display:none">
                 <h3>📋 Travel Guide & Tips</h3>
                 <ul class="tips-list" id="tipsList"></ul>
@@ -314,15 +391,169 @@
     <div class="toast" id="toast"></div>
 
     <footer>
-        <p>Built with real crowd data from Indian landmarks</p>
+        <p>Built with real crowd data from Indian landmarks · 📅 Live Calendar · 👥 Real-Time Confirmed Visitors</p>
     </footer>
 
     <script>
         let activeTab = 'single';
         let crowdChartInstance = null;
         let hourlyChartInstance = null;
+        let currentPlace = '';
+        let currentDate = '';
+        let userConfirmed = false;
 
-        /* Set min date to today */
+        /* Generate or retrieve persistent session ID */
+        function getSessionId() {
+            let sid = localStorage.getItem('visit_predictor_session');
+            if (!sid) {
+                sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+                localStorage.setItem('visit_predictor_session', sid);
+            }
+            return sid;
+        }
+        const SESSION_ID = getSessionId();
+
+        /* ─── User Auth State ─── */
+        let currentUser = JSON.parse(localStorage.getItem('visit_predictor_user') || 'null');
+
+        function openAuthModal(tab) {
+            const modal = document.getElementById('authModal');
+            modal.classList.add('visible');
+            switchAuthTab(tab || 'login');
+            document.getElementById('authErrorMsg').textContent = '';
+            document.getElementById('authErrorMsg').style.display = 'none';
+        }
+
+        function closeAuthModal(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('authModal').classList.remove('visible');
+        }
+
+        function switchAuthTab(tab) {
+            const loginBtn = document.getElementById('loginTabBtn');
+            const signupBtn = document.getElementById('signupTabBtn');
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            if (tab === 'login') {
+                loginBtn.classList.add('active');
+                signupBtn.classList.remove('active');
+                loginForm.style.display = 'block';
+                signupForm.style.display = 'none';
+            } else {
+                loginBtn.classList.remove('active');
+                signupBtn.classList.add('active');
+                loginForm.style.display = 'none';
+                signupForm.style.display = 'block';
+            }
+            document.getElementById('authErrorMsg').textContent = '';
+            document.getElementById('authErrorMsg').style.display = 'none';
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const loginId = document.getElementById('loginId').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginSubmitBtn');
+            const errMsg = document.getElementById('authErrorMsg');
+            btn.disabled = true;
+            btn.textContent = 'Signing In...';
+
+            fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ login_id: loginId, password })
+            })
+            .then(r => r.json())
+            .then(d => {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+                if (d.success) {
+                    currentUser = d.user;
+                    localStorage.setItem('visit_predictor_user', JSON.stringify(currentUser));
+                    updateUserUI();
+                    closeAuthModal();
+                    showToast(d.message, 'success');
+                    document.getElementById('loginForm').reset();
+                } else {
+                    errMsg.textContent = d.error || 'Login failed.';
+                    errMsg.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+                errMsg.textContent = 'Network error. Please try again.';
+                errMsg.style.display = 'block';
+            });
+        }
+
+        function handleSignup(e) {
+            e.preventDefault();
+            const username = document.getElementById('signupUsername').value.trim();
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const btn = document.getElementById('signupSubmitBtn');
+            const errMsg = document.getElementById('authErrorMsg');
+            btn.disabled = true;
+            btn.textContent = 'Creating Account...';
+
+            fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password })
+            })
+            .then(r => r.json())
+            .then(d => {
+                btn.disabled = false;
+                btn.textContent = 'Create Account';
+                if (d.success) {
+                    currentUser = d.user;
+                    localStorage.setItem('visit_predictor_user', JSON.stringify(currentUser));
+                    updateUserUI();
+                    closeAuthModal();
+                    showToast(d.message, 'success');
+                    document.getElementById('signupForm').reset();
+                } else {
+                    errMsg.textContent = d.error || 'Registration failed.';
+                    errMsg.style.display = 'block';
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.textContent = 'Create Account';
+                errMsg.textContent = 'Network error. Please try again.';
+                errMsg.style.display = 'block';
+            });
+        }
+
+        function logoutUser() {
+            currentUser = null;
+            localStorage.removeItem('visit_predictor_user');
+            updateUserUI();
+            showToast('You have been signed out.', 'success');
+        }
+
+        function updateUserUI() {
+            const authArea = document.getElementById('authNavArea');
+            if (currentUser) {
+                authArea.innerHTML = `
+                    <div class="user-badge-nav">
+                        <span class="user-name-text">${currentUser.username}</span>
+                        <button class="logout-nav-btn" onclick="logoutUser()">Sign Out</button>
+                    </div>`;
+            } else {
+                authArea.innerHTML = `<button class="auth-nav-btn" onclick="openAuthModal('login')">🔑 Sign In / Sign Up</button>`;
+            }
+            // Update confirm button text
+            if (typeof updateConfirmButton === 'function') {
+                updateConfirmButton();
+            }
+        }
+
+        /* Restore user session on load */
+        updateUserUI();
+
+
         (function () { const d = document.getElementById('dateInput'); const t = new Date(); const y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0'), day = String(t.getDate()).padStart(2, '0'); d.min = `${y}-${m}-${day}`; const mx = new Date(t); mx.setFullYear(mx.getFullYear() + 1); d.max = `${mx.getFullYear()}-${String(mx.getMonth() + 1).padStart(2, '0')}-${String(mx.getDate()).padStart(2, '0')}` })();
 
         /* Show toast notification */
@@ -436,7 +667,17 @@
             if (!valid) return;
             const btn = document.getElementById('predictBtn');
             btn.classList.add('loading'); btn.disabled = true;
-            fetch('/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ place, date }) })
+            currentPlace = place;
+            currentDate = date;
+
+            const payload = {
+                place,
+                date,
+                session_id: SESSION_ID,
+                user_id: currentUser ? currentUser.id : null
+            };
+
+            fetch('/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
                 .then(r => r.json()).then(d => {
                     btn.classList.remove('loading'); btn.disabled = false;
                     if (d.error) { showToast(d.error, 'error'); return }
@@ -495,7 +736,20 @@
             /* Crowd */
             document.getElementById('crowdBadge').innerHTML = '<span class="' + crowdClass(d.crowd_level) + '">' + d.crowd_level + '</span>';
             document.getElementById('crowdCount').textContent = 'Est. ' + d.crowd_count_est + ' visitors';
-            document.getElementById('crowdPredicted').innerHTML = '📈 Predicted: <strong>' + fmtCount(d.crowd_count_predicted) + '</strong> visitors';
+            document.getElementById('crowdPredicted').innerHTML = '📈 Adjusted Prediction: <strong>' + fmtCount(d.crowd_count_predicted) + '</strong> visitors';
+
+            /* Confirmed visitors display */
+            const confirmedDisp = document.getElementById('confirmedDisplay');
+            if (d.confirmed_visitors > 0) {
+                confirmedDisp.style.display = 'block';
+                let usersText = '';
+                if (d.confirmed_users && d.confirmed_users.length > 0) {
+                    usersText = `<div class="confirmed-users-list">👥 Confirmed Real Users: <strong>${d.confirmed_users.join(', ')}</strong></div>`;
+                }
+                document.getElementById('confirmedCount').innerHTML = `<span>${d.confirmed_visitors} visitor${d.confirmed_visitors !== 1 ? 's' : ''} confirmed</span>` + usersText;
+            } else {
+                confirmedDisp.style.display = 'none';
+            }
 
             /* Weather */
             document.getElementById('weatherIcon').textContent = weatherIcon(d.weather);
@@ -571,6 +825,30 @@
                 document.getElementById('ensembleVisualizer').style.display = 'block';
             } else {
                 document.getElementById('ensembleVisualizer').style.display = 'none';
+            }
+
+            /* Confirm Visit Card */
+            userConfirmed = d.user_confirmed || false;
+            document.getElementById('confirmVisitCard').style.display = 'block';
+            updateConfirmButton();
+
+            /* Prediction Source Bar */
+            const srcBar = document.getElementById('predictionSourceBar');
+            const srcBadge = document.getElementById('predSourceBadge');
+            const srcBreak = document.getElementById('sourceBreakdown');
+            srcBar.style.display = 'flex';
+            if (d.confirmed_visitors > 0) {
+                srcBadge.textContent = '🔄 ML + Real-Time Live Users';
+                srcBadge.className = 'source-badge live';
+                let usersListHTML = '';
+                if (d.confirmed_users && d.confirmed_users.length > 0) {
+                    usersListHTML = `<span>👥 Live Users: ${d.confirmed_users.join(', ')}</span><span>·</span>`;
+                }
+                srcBreak.innerHTML = `<span>🤖 ML Baseline: ${fmtCount(d.crowd_count_ml)}</span><span>·</span><span>🟢 Confirmed: ${d.confirmed_visitors}</span><span>·</span>${usersListHTML}<span>📊 Adjusted Real-Time: ${fmtCount(d.crowd_count_predicted)}</span>`;
+            } else {
+                srcBadge.textContent = '🤖 ML Prediction Only';
+                srcBadge.className = 'source-badge ml-only';
+                srcBreak.innerHTML = `<span>No confirmed visitors yet — be the first!</span>`;
             }
 
             /* Render Hourly Distribution */
@@ -920,10 +1198,83 @@
         /* Enter key to submit */
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSubmit();
+                const modal = document.getElementById('authModal');
+                if (!modal.classList.contains('visible')) {
+                    e.preventDefault();
+                    handleSubmit();
+                }
             }
         });
+
+        /* Toggle confirm/cancel visit with Authentication Requirement */
+        function toggleConfirmVisit() {
+            if (!currentPlace || !currentDate) return;
+
+            // Require Login for Real-Time User Confirmation
+            if (!currentUser) {
+                openAuthModal('login');
+                showToast("Please sign in or create an account to confirm your visit!", "error");
+                return;
+            }
+            
+            const endpoint = userConfirmed ? '/cancel-visit' : '/confirm-visit';
+            const btn = document.getElementById('confirmBtn');
+            btn.disabled = true;
+
+            const payload = {
+                place: currentPlace,
+                date: currentDate,
+                session_id: SESSION_ID,
+                user_id: currentUser.id,
+                username: currentUser.username
+            };
+            
+            fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(d => {
+                btn.disabled = false;
+                if (d.login_required) {
+                    openAuthModal('login');
+                    showToast(d.error, 'error');
+                    return;
+                }
+                if (d.success) {
+                    userConfirmed = !userConfirmed;
+                    updateConfirmButton();
+                    showToast(d.message, 'success');
+                    
+                    // Refresh prediction for updated real-time users list & count
+                    handlePredict();
+                } else {
+                    showToast(d.message || d.error || 'Something went wrong.', 'error');
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                showToast('Network error. Please try again.', 'error');
+            });
+        }
+
+        /* Update confirm button appearance */
+        function updateConfirmButton() {
+            const btn = document.getElementById('confirmBtn');
+            const btnText = document.getElementById('confirmBtnText');
+            if (userConfirmed) {
+                btn.classList.add('confirmed');
+                btnText.textContent = '❌ Cancel My Visit';
+            } else {
+                btn.classList.remove('confirmed');
+                if (currentUser) {
+                    btnText.textContent = '✅ I\'m Visiting';
+                } else {
+                    btnText.textContent = '✅ I\'m Visiting (Sign in)';
+                }
+            }
+        }
     </script>
 </body>
 

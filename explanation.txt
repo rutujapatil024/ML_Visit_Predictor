@@ -156,19 +156,25 @@ When a user queries a landmark and date, the backend performs the following step
 
 1. Feature Extraction: Parses the queried date to compute day_of_month, month, is_weekend,
    week_of_year, event_type, is_festival, and is_holiday.
-2. Holiday/Festival Enrichment: Maps the date against a comprehensive dictionary of 
-   Indian Public Holidays & Festivals (spanning 2025 and 2026, e.g., Republic Day, Holi,
-   Diwali, Christmas) and seasonal windows (e.g., Dussehra/Diwali season, Republic Day 
-   long weekend).
+2. Holiday/Festival Enrichment: Fetches holidays DYNAMICALLY from the Python 'holidays'
+   library + Nager.Date API. Data is cached per-year in memory. This replaces the old
+   hardcoded INDIAN_HOLIDAYS dictionary and works for ANY future year automatically.
 3. ML Execution: Calls the saved Random Forest models to predict:
    - Crowd Level (classification)
    - Crowd Count (regression — actual predicted visitor numbers)
    - Temperature (regression)
-4. Weather Resolution:
+4. Confirmed Visitor Blending (NEW):
+   - Queries the SQLite database for confirmed visitors for this place + date.
+   - Blends ML prediction with real-time confirmed data using the formula:
+     final_count = (ML_WEIGHT * ml_count) + ((1 - ML_WEIGHT) * confirmed_count * SCALE)
+   - ML_WEIGHT = 0.6 (60% ML, 40% live confirmed data)
+   - CONFIRMED_VISITOR_SCALE = 50 (each confirmed user represents ~50 actual visitors)
+   - The blended count is always at least the estimated real visitors.
+5. Weather Resolution:
    - For dates within 16 days: Fetches LIVE weather from Open-Meteo API (see Section 9).
    - For dates beyond 16 days: Falls back to ML weather lookup table.
    - Response includes a "weather_source" field indicating "Live Forecast" or "ML Prediction".
-5. Visit Score Calculation (0 - 100):
+6. Visit Score Calculation (0 - 100):
    * Base Score: Determined by the predicted crowd level:
      - Low: 90
      - Moderate: 65
@@ -186,14 +192,14 @@ When a user queries a landmark and date, the backend performs the following step
    * Natural Jitter: A deterministic pseudo-random hash noise of -5 to +5 is added based 
      on the date string to reflect real-world natural fluctuation on adjacent dates.
    * Clamped: The final score is bound between 0 and 100.
-6. Recommendation Categories:
+7. Recommendation Categories:
    * YES: Visit Score >= 70
    * MAYBE: Visit Score between 40 and 69
    * NO: Visit Score < 40
-7. Better Dates Scan:
+8. Better Dates Scan:
    * Backend automatically runs the prediction pipeline for the next 60 days.
    * Returns the top 3 dates with the highest overall Visit Score.
-8. Contextual Travel Tips:
+9. Contextual Travel Tips:
    * Extreme Heat warning (Temp >= 38C): limit exposure, carry hydration.
    * Rain (Rainy): Bring umbrellas, caution on slippery stone steps.
    * Crowds (High/Extreme): Book tickets online to avoid queue, arrive before 8:00 AM.
@@ -205,12 +211,21 @@ When a user queries a landmark and date, the backend performs the following step
 The frontend dashboard is designed as a single-page web app using Flask:
   * Backend API:
     - GET '/' : Renders the home template with landmark selections.
-    - POST '/predict' : Accepts JSON {place, date} and returns crowd prediction,
-      score, temperature, weather, tips, holiday details, and better dates.
+    - POST '/predict' : Accepts JSON {place, date, session_id} and returns crowd
+      prediction, score, temperature, weather, tips, holiday details, confirmed
+      visitors data, blended predictions, and better dates.
     - POST '/compare' : Accepts JSON {places, date} (2 or 3 landmarks) and returns
       a comparative breakdown, flagging the absolute best destination with an "is_best" key.
     - POST '/chart-data' : Accepts JSON {place, date} and returns monthly crowd trend
       data for Chart.js visualization (dates, crowd counts, temperatures, levels).
+    - POST '/confirm-visit' : Accepts JSON {place, date, session_id} and stores a
+      confirmed visit in the SQLite database. Returns updated confirmed count.
+    - POST '/cancel-visit' : Accepts JSON {place, date, session_id} and removes a
+      confirmed visit. Returns updated confirmed count.
+    - POST '/live-stats' : Accepts JSON {date, place?} and returns real-time confirmed
+      visitor counts for one or all places on that date.
+    - POST '/holidays' : Accepts JSON {year} and returns dynamically fetched holiday
+      data for the requested year from the holidays library + Nager.Date API.
   * UI/UX Aesthetics:
     - Dark-mode primary design with glassmorphism panels.
     - Split-screen results layout presenting a high-resolution landmark image banner 
@@ -221,6 +236,9 @@ The frontend dashboard is designed as a single-page web app using Flask:
     - Circular SVG progress indicators showing the Visit Score.
     - Interactive Chart.js bar/line chart showing monthly crowd trends with temperature overlay.
     - Weather source badge indicating "Live Forecast" or "ML Prediction".
+    - Confirmed visitor counter with live pulsing green dot indicator.
+    - "I'm Planning to Visit" confirmation button with toggle between confirm/cancel states.
+    - Prediction source breakdown bar showing ML vs confirmed data blend.
     - Highly responsive layout adapting gracefully to mobile (collapsing to vertical columns) and desktop.
     - Integrated Landmark Comparison Drawer to contrast weather, temperature, and crowds.
 
@@ -276,7 +294,66 @@ B. Hourly Distribution Curves
     and coolest temperature window (e.g. 6:00 AM or 8:00 AM for outdoor monuments).
 
 --------------------------------------------------------------------------------
-10. HOW TO RUN THE PROJECT
+10. LIVE CALENDAR INTEGRATION
+--------------------------------------------------------------------------------
+The application fetches Indian holidays and festivals dynamically using two sources:
+
+  * Primary: Python 'holidays' library (v0.40+)
+    - Supports India (country code 'IN') with government holidays.
+    - Automatically calculates dates for any year (no hardcoding needed).
+    - Works offline without API keys.
+
+  * Supplementary: Nager.Date API (free, no key required)
+    - URL: https://date.nager.at/api/v3/PublicHolidays/{year}/IN
+    - Fetches additional public holidays not covered by the library.
+    - Falls back gracefully if the API is unavailable.
+
+  * Holiday Classification:
+    - Each fetched holiday is classified into: National Holiday, Festival,
+      Religious Holiday, Regional Holiday, or Public Holiday.
+    - Classification uses keyword matching against the holiday name.
+
+  * Caching:
+    - Holiday data is cached in-memory per year on first access.
+    - Pre-warms cache for current year and next year at app startup.
+    - Festival season windows (approximate busy-period ranges) remain as static
+      data since they represent general patterns, not exact dates.
+
+--------------------------------------------------------------------------------
+11. CONFIRMED VISITOR TRACKING SYSTEM
+--------------------------------------------------------------------------------
+The application includes a real-time confirmed visitor system:
+
+  * Storage: SQLite database (visitors.db)
+    - Table: confirmed_visits (id, place, date, session_id, created_at)
+    - Unique constraint on (place, date, session_id) prevents duplicates.
+    - Auto-created on first app startup.
+
+  * Session Management:
+    - Each browser gets a persistent session ID stored in localStorage.
+    - Format: 'sess_{timestamp}_{random}'
+    - Ensures one confirmation per user per place-date.
+
+  * Blending Formula:
+    - When confirmed visitors exist:
+      final = (0.6 * ML_predicted) + (0.4 * confirmed * 50)
+    - Scale factor of 50: each confirmed user represents ~50 actual visitors.
+    - Floor: blended count is always >= estimated real visitors.
+    - When no confirmed visitors: ML prediction returned as-is.
+
+  * API Endpoints:
+    - POST /confirm-visit: Store a confirmed visit
+    - POST /cancel-visit: Remove a confirmed visit
+    - POST /live-stats: Get confirmed counts for a date
+
+  * Frontend:
+    - Green pulsing "Live Confirmed" indicator on crowd card.
+    - "I'm Visiting" / "Cancel My Visit" toggle button.
+    - Prediction source bar showing: ML count, confirmed count, adjusted total.
+    - Automatic re-prediction after confirming/cancelling.
+
+--------------------------------------------------------------------------------
+12. HOW TO RUN THE PROJECT
 --------------------------------------------------------------------------------
 1. Install Dependencies:
    pip install -r requirements.txt

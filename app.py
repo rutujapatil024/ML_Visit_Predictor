@@ -1,99 +1,171 @@
 """
 app.py — Flask Backend for "Should I Visit?" Crowd Predictor
 =============================================================
-Loads trained ML models, serves the frontend, and handles
-prediction requests via a REST API endpoint.
+Loads trained ML models, serves the frontend, handles
+user authentication (Register / Login), real-time confirmed
+visit tracking, and prediction blending.
 
 Features:
-  - Crowd level classification (Low/Moderate/High/Extreme)
-  - Crowd count regression (actual visitor numbers)
-  - Temperature prediction
-  - Weather API integration (Open-Meteo live forecast + ML fallback)
-  - Monthly crowd trend chart data
-  - Landmark comparison
-  - Better date suggestions
+  - User Signup / Login Authentication (Password Hashing via Werkzeug)
+  - Real-Time User Visit Confirmation & Cancellation
+  - SQLite Database (`visitors.db`) for User Data & Confirmed Visits
+  - Blended Real-Time Prediction Engine (ML + Live Users)
+  - Dynamic Live Calendar Integration (holidays library + Nager.Date API)
+  - Weather Forecast Integration (Open-Meteo live API + ML fallback)
+  - Multi-Model Ensemble predictions (Random Forest, Decision Tree, Gradient Boosting)
+  - Interactive Chart.js monthly trends & hourly density curves
 """
 
 import os
 import sys
 import json
+import uuid
+import sqlite3
 import numpy as np
 import pandas as pd
 import joblib
 import requests
+try:
+    import holidays  # type: ignore # pyright: ignore[reportMissingImports]
+    HAS_HOLIDAYS_LIB = True
+except ImportError:
+    holidays = None
+    HAS_HOLIDAYS_LIB = False
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, send_from_directory
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# Force UTF-8 output on Windows to avoid UnicodeEncodeError with emoji/unicode
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 
 # ══════════════════════════════════════════════════════
-# CONSTANTS — Indian Public Holidays & Festival Calendar
+# FEATURE COLUMNS FOR ML INFERENCE
+# ══════════════════════════════════════════════════════
+FEATURE_COLS = [
+    "place_enc", "month", "day_of_month", "Week_of_Year",
+    "is_weekend", "is_holiday", "is_festival", "event_enc"
+]
+
+
+# ══════════════════════════════════════════════════════
+# DYNAMIC HOLIDAY CALENDAR — Live Fetching
 # ══════════════════════════════════════════════════════
 
-INDIAN_HOLIDAYS = {
-    # ── 2025 National & Public Holidays ──────────────────
-    "2025-01-01": {"name": "New Year's Day",             "type": "Public Holiday"},
-    "2025-01-06": {"name": "Guru Gobind Singh Jayanti",  "type": "Religious Holiday"},
-    "2025-01-14": {"name": "Makar Sankranti / Pongal",   "type": "Festival"},
-    "2025-01-23": {"name": "Netaji Subhas Chandra Bose Jayanti", "type": "National Day"},
-    "2025-01-26": {"name": "Republic Day",               "type": "National Holiday"},
-    "2025-02-02": {"name": "Basant Panchami",            "type": "Festival"},
-    "2025-02-19": {"name": "Chhatrapati Shivaji Maharaj Jayanti", "type": "Regional Holiday"},
-    "2025-02-26": {"name": "Maha Shivaratri",            "type": "Festival"},
-    "2025-03-13": {"name": "Holika Dahan",               "type": "Festival"},
-    "2025-03-14": {"name": "Holi",                       "type": "Festival"},
-    "2025-03-30": {"name": "Ram Navami",                 "type": "Festival"},
-    "2025-03-31": {"name": "Eid ul-Fitr",                "type": "Festival"},
-    "2025-04-06": {"name": "Mahavir Jayanti",            "type": "Religious Holiday"},
-    "2025-04-10": {"name": "Maundy Thursday",            "type": "Religious Holiday"},
-    "2025-04-13": {"name": "Baisakhi / Vishu",           "type": "Festival"},
-    "2025-04-14": {"name": "Ambedkar Jayanti / Tamil New Year", "type": "Regional Holiday"},
-    "2025-04-18": {"name": "Good Friday",                "type": "Public Holiday"},
-    "2025-04-20": {"name": "Easter Sunday",              "type": "Religious Holiday"},
-    "2025-05-12": {"name": "Buddha Purnima",             "type": "Religious Holiday"},
-    "2025-06-07": {"name": "Eid ul-Adha (Bakrid)",       "type": "Festival"},
-    "2025-06-27": {"name": "Rath Yatra",                 "type": "Festival"},
-    "2025-07-06": {"name": "Muharram",                   "type": "Religious Holiday"},
-    "2025-08-09": {"name": "Raksha Bandhan",             "type": "Festival"},
-    "2025-08-15": {"name": "Independence Day",           "type": "National Holiday"},
-    "2025-08-16": {"name": "Janmashtami",                "type": "Festival"},
-    "2025-08-27": {"name": "Ganesh Chaturthi",           "type": "Festival"},
-    "2025-09-05": {"name": "Milad-un-Nabi (Eid-e-Milad)", "type": "Religious Holiday"},
-    "2025-09-22": {"name": "Navratri Begins",            "type": "Festival"},
-    "2025-10-01": {"name": "Navratri Ends / Durga Ashtami", "type": "Festival"},
-    "2025-10-02": {"name": "Gandhi Jayanti / Dussehra",  "type": "National Holiday"},
-    "2025-10-20": {"name": "Diwali / Deepavali",         "type": "Festival"},
-    "2025-10-21": {"name": "Govardhan Puja",             "type": "Festival"},
-    "2025-10-22": {"name": "Bhai Dooj",                  "type": "Festival"},
-    "2025-11-05": {"name": "Guru Nanak Jayanti",         "type": "Religious Holiday"},
-    "2025-11-15": {"name": "Jharkhand Foundation Day",   "type": "Regional Holiday"},
-    "2025-12-25": {"name": "Christmas Day",              "type": "Public Holiday"},
+# In-memory cache: { year: { "YYYY-MM-DD": { "name": ..., "type": ... } } }
+_holiday_cache = {}
 
-    # ── 2026 National & Public Holidays ──────────────────
-    "2026-01-01": {"name": "New Year's Day",             "type": "Public Holiday"},
-    "2026-01-14": {"name": "Makar Sankranti / Pongal",   "type": "Festival"},
-    "2026-01-26": {"name": "Republic Day",               "type": "National Holiday"},
-    "2026-02-15": {"name": "Maha Shivaratri",            "type": "Festival"},
-    "2026-03-03": {"name": "Holi",                       "type": "Festival"},
-    "2026-03-20": {"name": "Ram Navami",                 "type": "Festival"},
-    "2026-03-21": {"name": "Eid ul-Fitr",                "type": "Festival"},
-    "2026-03-26": {"name": "Mahavir Jayanti",            "type": "Religious Holiday"},
-    "2026-04-02": {"name": "Good Friday",                "type": "Public Holiday"},
-    "2026-04-14": {"name": "Ambedkar Jayanti",           "type": "Regional Holiday"},
-    "2026-05-01": {"name": "Maharashtra / Gujarat Day",  "type": "Regional Holiday"},
-    "2026-05-31": {"name": "Buddha Purnima",             "type": "Religious Holiday"},
-    "2026-06-27": {"name": "Eid ul-Adha (Bakrid)",       "type": "Festival"},
-    "2026-07-29": {"name": "Raksha Bandhan",             "type": "Festival"},
-    "2026-08-15": {"name": "Independence Day",           "type": "National Holiday"},
-    "2026-08-05": {"name": "Janmashtami",                "type": "Festival"},
-    "2026-08-19": {"name": "Ganesh Chaturthi",           "type": "Festival"},
-    "2026-10-02": {"name": "Gandhi Jayanti",             "type": "National Holiday"},
-    "2026-10-11": {"name": "Dussehra",                   "type": "Festival"},
-    "2026-11-08": {"name": "Diwali",                     "type": "Festival"},
-    "2026-11-24": {"name": "Guru Nanak Jayanti",         "type": "Religious Holiday"},
-    "2026-12-25": {"name": "Christmas Day",              "type": "Public Holiday"},
-}
+# Nager.Date API cache: { year: { "YYYY-MM-DD": { "name": ..., "type": ... } } }
+_nager_cache = {}
 
-# ── Festival Season Windows ───────────────────────────
+
+def _get_holidays_lib_data(year):
+    """Fetch Indian holidays for a given year using the 'holidays' Python library."""
+    if year in _holiday_cache:
+        return _holiday_cache[year]
+
+    if not HAS_HOLIDAYS_LIB or holidays is None:
+        _holiday_cache[year] = {}
+        return {}
+
+    try:
+        india_holidays = holidays.India(years=year)
+        result = {}
+        for date_obj, name in sorted(india_holidays.items()):
+            date_str = date_obj.strftime("%Y-%m-%d")
+            htype = _classify_holiday_type(name)
+            result[date_str] = {"name": name, "type": htype}
+        
+        _holiday_cache[year] = result
+        print(f"  ✓ Loaded {len(result)} holidays for {year} from holidays library")
+        return result
+    except Exception as e:
+        print(f"  ⚠ holidays library error for {year}: {e}")
+        _holiday_cache[year] = {}
+        return {}
+
+
+def _fetch_nager_holidays(year):
+    """Fetch Indian public holidays from Nager.Date API as supplementary source."""
+    if year in _nager_cache:
+        return _nager_cache[year]
+
+    try:
+        url = f"https://date.nager.at/api/v3/PublicHolidays/{year}/IN"
+        resp = requests.get(url, timeout=5)
+        if resp.status_code != 200:
+            _nager_cache[year] = {}
+            return {}
+
+        data = resp.json()
+        result = {}
+        for entry in data:
+            date_str = entry.get("date", "")
+            name = entry.get("localName", entry.get("name", "Holiday"))
+            htype = _classify_holiday_type(name)
+            result[date_str] = {"name": name, "type": htype}
+
+        _nager_cache[year] = result
+        print(f"  ✓ Fetched {len(result)} holidays for {year} from Nager.Date API")
+        return result
+    except (requests.RequestException, ValueError, KeyError) as e:
+        print(f"  ⚠ Nager.Date API error for {year}: {e}")
+        _nager_cache[year] = {}
+        return {}
+
+
+def _classify_holiday_type(name):
+    """Classify a holiday name into a type category for the prediction engine."""
+    name_lower = name.lower()
+
+    national_keywords = ["republic day", "independence day", "gandhi jayanti",
+                         "gandhi birthday", "mahatma gandhi"]
+    if any(kw in name_lower for kw in national_keywords):
+        return "National Holiday"
+
+    festival_keywords = ["diwali", "deepavali", "holi", "dussehra", "navratri",
+                        "durga puja", "ganesh chaturthi", "raksha bandhan",
+                        "janmashtami", "pongal", "onam", "baisakhi",
+                        "makar sankranti", "chhath", "lohri", "bihu",
+                        "eid", "ramadan", "eid ul-fitr", "eid ul-adha",
+                        "bakrid", "christmas", "easter", "govardhan",
+                        "bhai dooj", "karva chauth", "ram navami",
+                        "rath yatra", "guru nanak"]
+    if any(kw in name_lower for kw in festival_keywords):
+        return "Festival"
+
+    religious_keywords = ["maha shivaratri", "shivaratri", "buddha purnima",
+                         "mahavir jayanti", "good friday", "milad",
+                         "muharram", "guru gobind", "basant panchami",
+                         "holika"]
+    if any(kw in name_lower for kw in religious_keywords):
+        return "Religious Holiday"
+
+    regional_keywords = ["jayanti", "foundation day", "ambedkar",
+                        "shivaji", "subhas", "netaji", "vishu",
+                        "tamil new year", "ugadi", "gudi padwa"]
+    if any(kw in name_lower for kw in regional_keywords):
+        return "Regional Holiday"
+
+    return "Public Holiday"
+
+
+def get_holidays_for_year(year):
+    """Get merged holiday data for a year from all sources."""
+    lib_data = _get_holidays_lib_data(year)
+    nager_data = _fetch_nager_holidays(year)
+    merged = dict(lib_data)
+    for date_str, info in nager_data.items():
+        if date_str not in merged:
+            merged[date_str] = info
+    return merged
+
+
+# ── Festival Season Windows (approximate busy periods) ───
 FESTIVAL_SEASONS = [
     (1,  12, 1,  16, "Makar Sankranti / Pongal Season"),
     (1,  24, 1,  27, "Republic Day Long Weekend"),
@@ -181,14 +253,266 @@ WMO_WEATHER_MAP = {
     95: "Rainy", 96: "Rainy", 99: "Rainy",
 }
 
+# ── Confirmed Visitor Scale Factor ────────────────────
+CONFIRMED_VISITOR_SCALE = 50
+
+# ── ML weight for blending predictions ────────────────
+ML_WEIGHT = 0.6  # 60% ML prediction, 40% scaled confirmed visitors
+
+
+# ══════════════════════════════════════════════════════
+# SQLITE — Database Setup (Users & Confirmed Visits)
+# ══════════════════════════════════════════════════════
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visitors.db")
+
+
+def init_db():
+    """Initialize the SQLite database with users and confirmed_visits tables."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # Users Table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+    # Confirmed Visits Table
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS confirmed_visits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            place TEXT NOT NULL,
+            date TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            user_id INTEGER,
+            username TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(place, date, session_id)
+        )
+    """)
+
+    # Ensure missing columns exist
+    c.execute("PRAGMA table_info(confirmed_visits)")
+    cols = [row[1] for row in c.fetchall()]
+    if "user_id" not in cols:
+        c.execute("ALTER TABLE confirmed_visits ADD COLUMN user_id INTEGER")
+    if "username" not in cols:
+        c.execute("ALTER TABLE confirmed_visits ADD COLUMN username TEXT")
+
+    conn.commit()
+    conn.close()
+    print("  ✓ SQLite database initialized (users + visitors.db)")
+
+
+# ── USER AUTHENTICATION DATABASE FUNCTIONS ───────────
+
+def register_user(username, email, password):
+    """Register a new user in the SQLite database."""
+    username = username.strip()
+    email = email.strip().lower()
+
+    if len(username) < 3:
+        return {"error": "Username must be at least 3 characters long."}
+    if "@" not in email or "." not in email:
+        return {"error": "Please enter a valid email address."}
+    if len(password) < 6:
+        return {"error": "Password must be at least 6 characters long."}
+
+    pwd_hash = generate_password_hash(password)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute(
+            "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+            (username, email, pwd_hash)
+        )
+        conn.commit()
+        user_id = c.lastrowid
+        conn.close()
+        return {
+            "success": True,
+            "user": {"id": user_id, "username": username, "email": email},
+            "message": f"Welcome, {username}! Account created successfully."
+        }
+    except sqlite3.IntegrityError as e:
+        conn.close()
+        err_str = str(e).lower()
+        if "username" in err_str:
+            return {"error": "Username is already taken. Please choose another."}
+        elif "email" in err_str:
+            return {"error": "Email is already registered. Please log in."}
+        else:
+            return {"error": "User with this username or email already exists."}
+
+
+def authenticate_user(login_id, password):
+    """Authenticate user with username/email and password."""
+    login_id = login_id.strip()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, username, email, password_hash FROM users WHERE username = ? OR email = ?",
+        (login_id, login_id.lower())
+    )
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        return {"error": "Invalid username/email or password."}
+
+    uid, uname, uemail, phash = row
+    if not check_password_hash(phash, password):
+        return {"error": "Invalid username/email or password."}
+
+    return {
+        "success": True,
+        "user": {"id": uid, "username": uname, "email": uemail},
+        "message": f"Welcome back, {uname}!"
+    }
+
+
+def get_user_by_id(user_id):
+    """Retrieve user details by ID."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, username, email FROM users WHERE id = ?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {"id": row[0], "username": row[1], "email": row[2]}
+    return None
+
+
+# ── CONFIRMED VISITS DATABASE FUNCTIONS ──────────────
+
+def get_confirmed_info(place, date_str):
+    """Get count and usernames of confirmed visitors for a place and date."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # Total count
+    c.execute(
+        "SELECT COUNT(*) FROM confirmed_visits WHERE place = ? AND date = ?",
+        (place, date_str)
+    )
+    total_count = c.fetchone()[0]
+
+    # Named users who confirmed
+    c.execute(
+        "SELECT DISTINCT username FROM confirmed_visits WHERE place = ? AND date = ? AND username IS NOT NULL AND username != ''",
+        (place, date_str)
+    )
+    user_rows = c.fetchall()
+    conn.close()
+
+    confirmed_users = [r[0] for r in user_rows]
+    return {
+        "count": total_count,
+        "users": confirmed_users
+    }
+
+
+def add_confirmed_visit(place, date_str, session_id, user_id=None, username=None):
+    """Add or update a confirmed visit for a user/session. Returns True if new, False if updated/duplicate."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+
+    # Check existing visit for user_id or session_id
+    if user_id:
+        c.execute(
+            "SELECT id FROM confirmed_visits WHERE place = ? AND date = ? AND (user_id = ? OR session_id = ?)",
+            (place, date_str, user_id, session_id)
+        )
+        row = c.fetchone()
+        if row:
+            c.execute(
+                "UPDATE confirmed_visits SET user_id = ?, username = ? WHERE id = ?",
+                (user_id, username, row[0])
+            )
+            conn.commit()
+            conn.close()
+            return False
+
+    try:
+        c.execute(
+            "INSERT INTO confirmed_visits (place, date, session_id, user_id, username, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (place, date_str, session_id, user_id, username, datetime.now().isoformat())
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except sqlite3.IntegrityError:
+        conn.close()
+        return False
+
+
+def remove_confirmed_visit(place, date_str, session_id, user_id=None):
+    """Remove a confirmed visit for a user or session."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    if user_id:
+        c.execute(
+            "DELETE FROM confirmed_visits WHERE place = ? AND date = ? AND (user_id = ? OR session_id = ?)",
+            (place, date_str, user_id, session_id)
+        )
+    else:
+        c.execute(
+            "DELETE FROM confirmed_visits WHERE place = ? AND date = ? AND session_id = ?",
+            (place, date_str, session_id)
+        )
+    removed = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return removed
+
+
+def is_visit_confirmed(place, date_str, session_id, user_id=None):
+    """Check if a specific session or user has confirmed a visit."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    if user_id:
+        c.execute(
+            "SELECT COUNT(*) FROM confirmed_visits WHERE place = ? AND date = ? AND (user_id = ? OR session_id = ?)",
+            (place, date_str, user_id, session_id)
+        )
+    else:
+        c.execute(
+            "SELECT COUNT(*) FROM confirmed_visits WHERE place = ? AND date = ? AND session_id = ?",
+            (place, date_str, session_id)
+        )
+    confirmed = c.fetchone()[0] > 0
+    conn.close()
+    return confirmed
+
+
+def get_all_confirmed_for_date(date_str):
+    """Get confirmed visitor counts and usernames for all places on a date."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "SELECT place, COUNT(*) as cnt FROM confirmed_visits WHERE date = ? GROUP BY place",
+        (date_str,)
+    )
+    result = {row[0]: row[1] for row in c.fetchall()}
+    conn.close()
+    return result
+
 
 # ══════════════════════════════════════════════════════
 # FLASK APP SETUP
 # ══════════════════════════════════════════════════════
 
 app = Flask(__name__)
+app.secret_key = "visit_predictor_antigravity_secret_key"
 
-# ── Load Models ───────────────────────────────────────
+# Initialize SQLite tables
+init_db()
 
 
 def load_models():
@@ -201,7 +525,6 @@ def load_models():
         "encoders.pkl", "weather_lookup.pkl", "model_metrics.json"
     ]
 
-    # Check models directory exists
     if not os.path.exists(model_dir):
         print("\n" + "=" * 60)
         print("  ❌ ERROR: Models not found!")
@@ -209,14 +532,12 @@ def load_models():
         print("=" * 60 + "\n")
         sys.exit(1)
 
-    # Check all required files exist
     for f in required_files:
         if not os.path.exists(os.path.join(model_dir, f)):
             print(f"\n  ❌ ERROR: {f} not found in models/")
             print("  Please run: python train_model.py")
             sys.exit(1)
 
-    # Load model binaries
     rf_crowd = joblib.load(os.path.join(model_dir, "crowd_model.pkl"))
     dt_crowd = joblib.load(os.path.join(model_dir, "dt_crowd_model.pkl"))
     gb_crowd = joblib.load(os.path.join(model_dir, "gb_crowd_model.pkl"))
@@ -230,7 +551,6 @@ def load_models():
     encoders = joblib.load(os.path.join(model_dir, "encoders.pkl"))
     weather_lookup = joblib.load(os.path.join(model_dir, "weather_lookup.pkl"))
 
-    # Load metrics JSON
     with open(os.path.join(model_dir, "model_metrics.json"), "r", encoding="utf-8") as f:
         model_metrics = json.load(f)
 
@@ -257,32 +577,15 @@ model_metrics = loaded["metrics"]
 classifiers = loaded["classifiers"]
 regressors = loaded["regressors"]
 
-# Landmark-specific hourly density profiles (weights for each hour from 6 AM to 9 PM)
 HOURLY_PROFILES = {
-    "Taj Mahal, Agra": [
-        12, 14, 10, 8, 7, 6, 5, 4, 4, 6, 10, 14, 10, 0, 0, 0 # Closed after sunset (6 PM onwards set to 0)
-    ],
-    "Varanasi Ghats, Varanasi": [
-        18, 14, 8, 5, 4, 3, 3, 2, 2, 3, 6, 12, 16, 12, 6, 2  # Peaks at 6 AM and 6 PM for Aarti
-    ],
-    "India Gate, Delhi": [
-        1, 2, 3, 3, 4, 3, 2, 2, 4, 8, 14, 20, 22, 18, 12, 6   # Massively peaks in the evening (5 PM - 9 PM)
-    ],
-    "Gateway of India, Mumbai": [
-        3, 4, 5, 6, 6, 5, 4, 4, 6, 8, 12, 16, 18, 14, 8, 4    # Sunset/evening peak
-    ],
-    "Red Fort, Delhi": [
-        0, 0, 0, 8, 12, 14, 15, 12, 10, 10, 12, 12, 5, 0, 0, 0 # Open 9 AM - 6 PM, peaks mid-day
-    ],
-    "Qutub Minar, Delhi": [
-        0, 2, 4, 8, 10, 12, 10, 8, 8, 10, 12, 14, 8, 4, 0, 0  # Open 7 AM - 9 PM, peaks mid-day and sunset
-    ],
-    "Mecca Masjid, Hyderabad": [
-        0, 0, 4, 6, 8, 14, 16, 10, 8, 12, 14, 8, 4, 0, 0, 0   # Peaks around Dhuhr (12 PM - 2 PM) and Asr (4 PM - 5 PM)
-    ],
-    "Sanchi Stupa, Madhya Pradesh": [
-        2, 4, 6, 10, 14, 16, 15, 12, 10, 8, 6, 4, 2, 0, 0, 0  # Open 6:30 AM - 6:30 PM, peak mid-day
-    ]
+    "Taj Mahal, Agra":               [12, 14, 10, 8, 7, 6, 5, 4, 4, 6, 10, 14, 10, 0, 0, 0],
+    "Varanasi Ghats, Varanasi":      [18, 14, 8, 5, 4, 3, 3, 2, 2, 3, 6, 12, 16, 12, 6, 2],
+    "India Gate, Delhi":             [1, 2, 3, 3, 4, 3, 2, 2, 4, 8, 14, 20, 22, 18, 12, 6],
+    "Gateway of India, Mumbai":      [3, 4, 5, 6, 6, 5, 4, 4, 6, 8, 12, 16, 18, 14, 8, 4],
+    "Red Fort, Delhi":               [0, 0, 0, 8, 12, 14, 15, 12, 10, 10, 12, 12, 5, 0, 0, 0],
+    "Qutub Minar, Delhi":           [0, 2, 4, 8, 10, 12, 10, 8, 8, 10, 12, 14, 8, 4, 0, 0],
+    "Mecca Masjid, Hyderabad":       [0, 0, 4, 6, 8, 14, 16, 10, 8, 12, 14, 8, 4, 0, 0, 0],
+    "Sanchi Stupa, Madhya Pradesh":  [2, 4, 6, 10, 14, 16, 15, 12, 10, 8, 6, 4, 2, 0, 0, 0]
 }
 
 
@@ -290,38 +593,26 @@ def generate_hourly_data(place, daily_count, daily_temp):
     """Generate hourly crowd counts and temperatures for the landmark."""
     hours = ["6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
              "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM"]
-    
-    # Temperature hourly offsets (relative to daily average)
     temp_offsets = [-4, -3, -1, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0, -1, -2]
-    
-    # Get profile or fallback to a standard bell curve
     profile = HOURLY_PROFILES.get(place, [4, 5, 6, 7, 8, 9, 10, 9, 8, 7, 6, 5, 4, 4, 4, 4])
-    
-    # Normalize profile weights
     total_weight = sum(profile)
     normalized_weights = [w / total_weight for w in profile]
     
     hourly_data = []
     for i, hour in enumerate(hours):
         h_weight = normalized_weights[i]
-        
-        # Calculate crowd count at this hour
         h_count = int(round(daily_count * h_weight))
-        
-        # Temperature
         h_temp = int(round(daily_temp + temp_offsets[i]))
-        
         hourly_data.append({
             "hour": hour,
             "crowd_count": max(0, h_count),
             "temperature": h_temp
         })
-        
     return hourly_data
 
 
 def predict_ensemble(place, date_str):
-    """Generate predictions from all three ensemble models (RF, DT, GB)."""
+    """Generate predictions from all three ensemble models using pandas DataFrame for feature names."""
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
@@ -340,21 +631,20 @@ def predict_ensemble(place, date_str):
     place_enc = encoders["Place"].transform([place])[0]
     event_enc = encoders["Event"].transform([event_type])[0]
 
-    features = np.array([[
+    # Create DataFrame with exact column names to avoid sklearn UserWarnings
+    features_df = pd.DataFrame([[
         place_enc, month, day_of_month, week_of_year,
         is_weekend, is_holiday, is_festival, event_enc
-    ]])
+    ]], columns=FEATURE_COLS)
 
     predictions = {}
     for name in ["Random Forest", "Decision Tree", "Gradient Boosting"]:
-        # Predict crowd level
         clf = classifiers[name]
-        cl_enc = clf.predict(features)[0]
+        cl_enc = clf.predict(features_df)[0]
         cl = encoders["crowd_level"].inverse_transform([cl_enc])[0]
 
-        # Predict raw crowd count
         reg = regressors[name]
-        cc = int(round(reg.predict(features)[0]))
+        cc = int(round(reg.predict(features_df)[0]))
         cc = max(0, cc)
 
         predictions[name] = {
@@ -364,16 +654,9 @@ def predict_ensemble(place, date_str):
 
     return predictions
 
-# ══════════════════════════════════════════════════════
-# WEATHER API (Open-Meteo)
-# ══════════════════════════════════════════════════════
-
 
 def fetch_live_weather(place, date_str):
-    """Fetch weather from Open-Meteo API for dates within forecast range.
-
-    Returns dict with temperature, weather, weather_source or None if unavailable.
-    """
+    """Fetch weather from Open-Meteo API for dates within forecast range."""
     coords = PLACE_COORDINATES.get(place)
     if not coords:
         return None
@@ -382,7 +665,6 @@ def fetch_live_weather(place, date_str):
     today = datetime.now().date()
     days_ahead = (target_date - today).days
 
-    # Open-Meteo provides 16-day forecasts
     if days_ahead < 0 or days_ahead > 15:
         return None
 
@@ -402,7 +684,6 @@ def fetch_live_weather(place, date_str):
 
         data = resp.json()
         daily = data.get("daily", {})
-
         if not daily.get("temperature_2m_max"):
             return None
 
@@ -420,19 +701,19 @@ def fetch_live_weather(place, date_str):
             "temp_max": int(round(temp_max)),
             "temp_min": int(round(temp_min)),
         }
-    except (requests.RequestException, KeyError, TypeError, ValueError) as e:
+    except Exception as e:
         print(f"  ⚠ Weather API error: {e}")
         return None
 
 
-# ══════════════════════════════════════════════════════
-# HELPER FUNCTIONS
-# ══════════════════════════════════════════════════════
-
-
 def is_indian_holiday(date_str):
-    """Check if a date string is a known Indian holiday. Returns holiday info dict or None."""
-    return INDIAN_HOLIDAYS.get(date_str, None)
+    """Check if a date string is a known Indian holiday using live calendar data."""
+    try:
+        year = int(date_str[:4])
+    except (ValueError, IndexError):
+        return None
+    year_holidays = get_holidays_for_year(year)
+    return year_holidays.get(date_str, None)
 
 
 def is_in_festival_season(month, day):
@@ -449,7 +730,7 @@ def is_in_festival_season(month, day):
 
 
 def get_event_type(date_str, month, day):
-    """Determine the event type for a given date based on holiday calendar."""
+    """Determine event type for a date using live holiday calendar."""
     holiday = is_indian_holiday(date_str)
     if holiday:
         htype = holiday["type"]
@@ -470,36 +751,41 @@ def get_event_type(date_str, month, day):
 
 
 def get_day_of_week_string(date_obj):
-    """Return the day of week as a string (Monday, Tuesday, etc.)."""
     return date_obj.strftime("%A")
 
+
 def generate_tips(temperature, weather, crowd_level):
-    """Generate contextual travel tips based on temperature, weather, and crowd levels."""
     tips = []
-    # Temperature tips
     if temperature >= 38:
         tips.append("⚠️ Extreme Heat: High temperature of " + str(temperature) + "°C expected. Limit outdoor exposure between 12 PM - 4 PM. Wear a hat, sunglasses, and carry hydration.")
     elif temperature >= 33:
         tips.append("☀️ Warm Day: Wear lightweight clothing, sunglasses, and sunscreen. Keep a water bottle handy.")
     elif temperature <= 16:
-        tips.append("❄️ Cool Day: Temperatures are cool (around " + str(temperature) + "°C). Layered clothing or a light jacket is recommended for early morning and evening.")
+        tips.append("❄️ Cool Day: Temperatures around " + str(temperature) + "°C. Layered clothing or a light jacket is recommended.")
 
-    # Weather tips
     if weather == "Rainy":
-        tips.append("🌧️ Rain Forecast: Bring an umbrella or raincoat. Outdoor stone steps and paths may be slippery.")
+        tips.append("🌧️ Rain Forecast: Bring an umbrella or raincoat. Paths and outdoor stone steps may be slippery.")
     elif weather == "Sunny":
-        tips.append("🕶️ UV Protection: Sunny sky expected. Sunscreen and a hat are highly recommended.")
+        tips.append("🕶️ UV Protection: Sunny skies expected. Sunscreen and sunglasses recommended.")
     elif weather == "Cloudy":
-        tips.append("📸 Photography Tip: Overcast skies offer beautifully soft, even lighting—perfect for clear photos without harsh shadows.")
+        tips.append("📸 Photography Tip: Overcast skies offer soft, even lighting—perfect for clear monument photos.")
 
-    # Crowd tips
     if crowd_level in ["High", "Extreme"]:
-        tips.append("🎟️ Ticket Booking: Book entry tickets online in advance to skip the long physical ticketing lines.")
-        tips.append("⏰ Early Arrival: Arrive early in the morning (before 8 AM) to beat the crowds and queues.")
+        tips.append("🎟️ Ticket Booking: Book entry tickets online in advance to skip physical queue lines.")
+        tips.append("⏰ Early Arrival: Arrive early in the morning (before 8 AM) to beat peak crowd entry queues.")
     elif crowd_level == "Low":
         tips.append("✨ Peaceful Visit: Excellent day to explore at a relaxed pace with minimal wait times.")
 
     return tips
+
+
+def blend_prediction(ml_count, confirmed_count):
+    """Blend ML predicted crowd count with confirmed visitor data."""
+    if confirmed_count == 0:
+        return ml_count
+    estimated_real = confirmed_count * CONFIRMED_VISITOR_SCALE
+    blended = int(round(ML_WEIGHT * ml_count + (1 - ML_WEIGHT) * estimated_real))
+    return max(blended, estimated_real)
 
 
 def predict_for_date(place, date_str):
@@ -509,63 +795,53 @@ def predict_for_date(place, date_str):
     except ValueError:
         return {"error": "Invalid date format. Use YYYY-MM-DD."}
 
-    # Extract date features
     month = date_obj.month
     day_of_month = date_obj.day
     week_of_year = date_obj.isocalendar()[1]
     day_of_week = get_day_of_week_string(date_obj)
-
-    # Determine is_weekend
     is_weekend = 1 if day_of_week in ["Saturday", "Sunday"] else 0
-
-    # Determine is_holiday
     holiday_info_data = is_indian_holiday(date_str)
     is_holiday = 1 if holiday_info_data else 0
-
-    # Determine event type and is_festival
     event_type = get_event_type(date_str, month, day_of_month)
     is_festival = 1 if event_type in ["Festival", "National Holiday", "Cultural Event"] else 0
 
-    # Holiday info string for display
     if holiday_info_data:
         holiday_info = f"{holiday_info_data['name']} – {holiday_info_data['type']}"
     else:
         season = is_in_festival_season(month, day_of_month)
-        if season:
-            holiday_info = f"{season}"
-        else:
-            holiday_info = "Regular Day"
+        holiday_info = f"{season}" if season else "Regular Day"
 
-    # Encode place
     try:
         place_enc = encoders["Place"].transform([place])[0]
     except ValueError:
         return {"error": f"Unknown place: {place}"}
 
-    # Encode event
     try:
         event_enc = encoders["Event"].transform([event_type])[0]
     except ValueError:
         event_enc = encoders["Event"].transform(["Regular Day"])[0]
 
-    # Build feature array in same order as training
-    features = np.array([[
+    # Create DataFrame with column names to fix sklearn warnings
+    features_df = pd.DataFrame([[
         place_enc, month, day_of_month, week_of_year,
         is_weekend, is_holiday, is_festival, event_enc
-    ]])
+    ]], columns=FEATURE_COLS)
 
-    # Predict crowd level
-    crowd_level_enc = crowd_model.predict(features)[0]
+    crowd_level_enc = crowd_model.predict(features_df)[0]
     crowd_level = encoders["crowd_level"].inverse_transform([crowd_level_enc])[0]
 
-    # Predict raw crowd count
-    crowd_count_predicted = int(round(crowd_count_model.predict(features)[0]))
-    crowd_count_predicted = max(0, crowd_count_predicted)  # Clamp to 0
+    crowd_count_ml = int(round(crowd_count_model.predict(features_df)[0]))
+    crowd_count_ml = max(0, crowd_count_ml)
 
-    # Predict temperature (ML fallback)
-    ml_temperature = int(round(temp_model.predict(features)[0]))
+    # Confirmed visitors info
+    conf_info = get_confirmed_info(place, date_str)
+    confirmed_count = conf_info["count"]
+    confirmed_users = conf_info["users"]
+    
+    crowd_count_predicted = blend_prediction(crowd_count_ml, confirmed_count)
 
-    # Get weather — try live API first, then fallback to lookup
+    ml_temperature = int(round(temp_model.predict(features_df)[0]))
+
     live_weather = fetch_live_weather(place, date_str)
     if live_weather:
         temperature = live_weather["temperature"]
@@ -580,26 +856,16 @@ def predict_for_date(place, date_str):
         temp_max = None
         temp_min = None
 
-    # Compute visit score
     visit_score = CROWD_SCORE_BASE.get(crowd_level, 50)
-
-    # Apply weather penalty
     visit_score += WEATHER_SCORE_PENALTY.get(weather, 0)
-
-    # Apply temperature penalty
     if temperature > 38:
         visit_score -= 12
     elif temperature > 36:
         visit_score -= 8
 
-    # Add small random variation based on date hash for natural feel
-    date_hash = hash(date_str) % 11 - 5  # -5 to +5
-    visit_score += date_hash
+    date_hash = hash(date_str) % 11 - 5
+    visit_score = max(0, min(100, visit_score + date_hash))
 
-    # Clamp score to 0-100
-    visit_score = max(0, min(100, visit_score))
-
-    # Determine recommendation
     if visit_score >= 70:
         recommendation = "YES"
     elif visit_score >= 40:
@@ -607,22 +873,24 @@ def predict_for_date(place, date_str):
     else:
         recommendation = "NO"
 
-    # Crowd count estimate (category range + predicted number)
     crowd_count_est = CROWD_COUNT_RANGES.get(crowd_level, "Unknown")
-
-    # Generate travel tips
     tips = generate_tips(temperature, weather, crowd_level)
 
     result = {
         "crowd_level": crowd_level,
         "crowd_count_est": crowd_count_est,
         "crowd_count_predicted": crowd_count_predicted,
+        "crowd_count_ml": crowd_count_ml,
+        "confirmed_visitors": confirmed_count,
+        "confirmed_users": confirmed_users,
+        "prediction_source": "ML + Real-Time Live Users" if confirmed_count > 0 else "ML Prediction Only",
         "temperature": temperature,
         "weather": weather,
         "weather_source": weather_source,
         "visit_score": visit_score,
         "recommendation": recommendation,
         "holiday_info": holiday_info,
+        "holiday_source": "Live Calendar",
         "event_type": event_type,
         "day_of_week": day_of_week,
         "date": date_str,
@@ -637,18 +905,14 @@ def predict_for_date(place, date_str):
 
 
 def find_better_dates(place, start_date_str):
-    """Scan next 60 days and return top 3 dates with best visit scores."""
     start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
     all_dates = []
-
     for i in range(1, 61):
         check_date = start_date + timedelta(days=i)
         check_str = check_date.strftime("%Y-%m-%d")
         result = predict_for_date(place, check_str)
-
         if "error" in result:
             continue
-
         all_dates.append({
             "date": check_str,
             "day_of_week": result["day_of_week"],
@@ -659,76 +923,120 @@ def find_better_dates(place, start_date_str):
             "visit_score": result["visit_score"],
             "holiday_info": result["holiday_info"],
         })
-
-    # Sort by visit score descending and return top 3
     all_dates.sort(key=lambda x: -x["visit_score"])
     return all_dates[:3]
 
 
 # ══════════════════════════════════════════════════════
-# ROUTES
+# ROUTES & AUTHENTICATION ENDPOINTS
 # ══════════════════════════════════════════════════════
-
 
 @app.route("/")
 def index():
-    """Render the main frontend page with place list."""
     return render_template("index.html", places=PLACES)
 
 
 @app.route("/static/index.css")
 def serve_css():
-    """Serve the CSS file from the templates directory."""
     return send_from_directory("templates", "index.css", mimetype="text/css")
 
 
+# ── AUTHENTICATION ROUTES ─────────────────────────────
+
+@app.route("/register", methods=["POST"])
+def auth_register():
+    """Register a new user."""
+    try:
+        data = request.get_json() or {}
+        username = data.get("username", "").strip()
+        email = data.get("email", "").strip()
+        password = data.get("password", "").strip()
+
+        if not username or not email or not password:
+            return jsonify({"error": "Please provide username, email, and password."}), 400
+
+        res = register_user(username, email, password)
+        if "error" in res:
+            return jsonify(res), 400
+        return jsonify(res)
+    except Exception as e:
+        print(f"  ❌ Register error: {e}")
+        return jsonify({"error": "Registration failed. Please try again."}), 500
+
+
+@app.route("/login", methods=["POST"])
+def auth_login():
+    """Log in an existing user."""
+    try:
+        data = request.get_json() or {}
+        login_id = data.get("login_id", "").strip()
+        password = data.get("password", "").strip()
+
+        if not login_id or not password:
+            return jsonify({"error": "Please enter your username/email and password."}), 400
+
+        res = authenticate_user(login_id, password)
+        if "error" in res:
+            return jsonify(res), 400
+        return jsonify(res)
+    except Exception as e:
+        print(f"  ❌ Login error: {e}")
+        return jsonify({"error": "Login failed. Please try again."}), 500
+
+
+@app.route("/current-user", methods=["POST"])
+def current_user_route():
+    """Get profile info for a user ID."""
+    try:
+        data = request.get_json() or {}
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"user": None})
+        user = get_user_by_id(user_id)
+        return jsonify({"user": user})
+    except Exception as e:
+        return jsonify({"user": None})
+
+
+# ── PREDICTION & VISITOR ROUTES ───────────────────────
+
 @app.route("/predict", methods=["POST"])
 def predict():
-    """Handle prediction requests. Receives JSON with place and date."""
+    """Handle prediction requests."""
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"error": "No data received. Please send JSON."}), 400
+            return jsonify({"error": "No data received."}), 400
 
         place = data.get("place", "").strip()
         date_str = data.get("date", "").strip()
+        session_id = data.get("session_id", "")
+        user_id = data.get("user_id")
 
-        # Validate inputs
-        if not place:
-            return jsonify({"error": "Please select a destination."}), 400
-        if not date_str:
-            return jsonify({"error": "Please select a date."}), 400
+        if not place or not date_str:
+            return jsonify({"error": "Please select a destination and date."}), 400
         if place not in PLACES:
             return jsonify({"error": f"Unknown destination: {place}"}), 400
 
-        # Validate date format
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
         except ValueError:
             return jsonify({"error": "Invalid date format. Use YYYY-MM-DD."}), 400
 
-        # Run prediction
         result = predict_for_date(place, date_str)
-
         if "error" in result:
             return jsonify(result), 400
 
-        # Always find better dates for the selected place
         result["better_dates"] = find_better_dates(place, date_str)
-
-        # Generate ensemble predictions
         ensemble = predict_ensemble(place, date_str)
-
-        # Generate hourly distribution
         hourly = generate_hourly_data(place, result["crowd_count_predicted"], result["temperature"])
         
-        # Get best hour to visit
-        operating_hours = [h for h in hourly if h["crowd_count"] > 0]
-        if not operating_hours:
-            operating_hours = hourly
+        operating_hours = [h for h in hourly if h["crowd_count"] > 0] or hourly
         best_hour_data = min(operating_hours, key=lambda x: (x["crowd_count"], x["temperature"]))
         
-        # Inject into result
+        # Check confirmation status for this user or session
+        result["user_confirmed"] = is_visit_confirmed(place, date_str, session_id, user_id=user_id)
+
         result["ensemble_predictions"] = ensemble
         result["model_metrics"] = model_metrics
         result["hourly_distribution"] = hourly
@@ -741,26 +1049,119 @@ def predict():
         return jsonify({"error": "Something went wrong. Please try again."}), 500
 
 
+@app.route("/confirm-visit", methods=["POST"])
+def confirm_visit():
+    """Handle visit confirmation. Requires user authentication."""
+    try:
+        data = request.get_json() or {}
+        place = data.get("place", "").strip()
+        date_str = data.get("date", "").strip()
+        session_id = data.get("session_id", "").strip()
+        user_id = data.get("user_id")
+        username = data.get("username", "").strip()
+
+        if not place or not date_str or not session_id:
+            return jsonify({"error": "Missing required details (place, date, session)."}), 400
+        if place not in PLACES:
+            return jsonify({"error": f"Unknown destination: {place}"}), 400
+
+        # Require login for real-time user confirmation if user_id is missing
+        if not user_id or not username:
+            return jsonify({
+                "login_required": True,
+                "error": "Please sign in or create an account to confirm your visit and help others get real-time crowd predictions!"
+            }), 401
+
+        is_new = add_confirmed_visit(place, date_str, session_id, user_id=user_id, username=username)
+        conf_info = get_confirmed_info(place, date_str)
+
+        return jsonify({
+            "success": True,
+            "is_new": is_new,
+            "confirmed_count": conf_info["count"],
+            "confirmed_users": conf_info["users"],
+            "message": f"Awesome {username}! Your visit is confirmed for {date_str}."
+        })
+
+    except Exception as e:
+        print(f"  ❌ Confirm visit error: {e}")
+        return jsonify({"error": "Something went wrong."}), 500
+
+
+@app.route("/cancel-visit", methods=["POST"])
+def cancel_visit():
+    """Handle visit cancellation."""
+    try:
+        data = request.get_json() or {}
+        place = data.get("place", "").strip()
+        date_str = data.get("date", "").strip()
+        session_id = data.get("session_id", "").strip()
+        user_id = data.get("user_id")
+
+        if not place or not date_str:
+            return jsonify({"error": "Missing place or date."}), 400
+
+        removed = remove_confirmed_visit(place, date_str, session_id, user_id=user_id)
+        conf_info = get_confirmed_info(place, date_str)
+
+        return jsonify({
+            "success": True,
+            "removed": removed,
+            "confirmed_count": conf_info["count"],
+            "confirmed_users": conf_info["users"],
+            "message": "Visit cancelled."
+        })
+
+    except Exception as e:
+        print(f"  ❌ Cancel visit error: {e}")
+        return jsonify({"error": "Something went wrong."}), 500
+
+
+@app.route("/live-stats", methods=["POST"])
+def live_stats():
+    """Return live confirmed visitor stats."""
+    try:
+        data = request.get_json() or {}
+        date_str = data.get("date", "").strip()
+        place = data.get("place", "").strip()
+
+        if not date_str:
+            return jsonify({"error": "Missing date."}), 400
+
+        if place:
+            conf_info = get_confirmed_info(place, date_str)
+            return jsonify({
+                "date": date_str,
+                "place": place,
+                "confirmed_count": conf_info["count"],
+                "confirmed_users": conf_info["users"],
+                "estimated_real": conf_info["count"] * CONFIRMED_VISITOR_SCALE
+            })
+        else:
+            all_stats = get_all_confirmed_for_date(date_str)
+            return jsonify({
+                "date": date_str,
+                "places": {p: {"confirmed": c, "estimated": c * CONFIRMED_VISITOR_SCALE} for p, c in all_stats.items()}
+            })
+
+    except Exception as e:
+        print(f"  ❌ Live stats error: {e}")
+        return jsonify({"error": "Something went wrong."}), 500
+
+
 @app.route("/compare", methods=["POST"])
 def compare():
-    """Handle comparison requests. Receives JSON with list of places and date."""
+    """Handle landmark comparisons."""
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data received. Please send JSON."}), 400
-
+        data = request.get_json() or {}
         places = data.get("places", [])
         date_str = data.get("date", "").strip()
 
-        # Validate inputs
-        if not places or not isinstance(places, list):
-            return jsonify({"error": "Please select landmarks to compare."}), 400
-        if len(places) < 2 or len(places) > 3:
+        if not places or not isinstance(places, list) or len(places) < 2 or len(places) > 3:
             return jsonify({"error": "Please select 2 or 3 landmarks."}), 400
         if not date_str:
             return jsonify({"error": "Please select a date."}), 400
 
-        # Validate date format
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
         except ValueError:
@@ -778,7 +1179,6 @@ def compare():
             res["place"] = place
             results.append(res)
 
-        # Sort results by visit_score descending
         results.sort(key=lambda x: -x["visit_score"])
         for idx, res in enumerate(results):
             res["is_best"] = (idx == 0)
@@ -787,40 +1187,32 @@ def compare():
 
     except Exception as e:
         print(f"  ❌ Comparison error: {e}")
-        return jsonify({"error": "Something went wrong. Please try again."}), 500
-
+        return jsonify({"error": "Something went wrong."}), 500
 
 
 @app.route("/chart-data", methods=["POST"])
 def chart_data():
-    """Return monthly crowd trend data for Chart.js visualization."""
+    """Return monthly crowd trend data."""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         place = data.get("place", "").strip()
         date_str = data.get("date", "").strip()
 
         if place not in PLACES:
             return jsonify({"error": f"Unknown place: {place}"}), 400
 
-        # Parse the target date to get month/year
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
         year = target_date.year
         month = target_date.month
 
-        # Generate predictions for each day of the month
         import calendar
         days_in_month = calendar.monthrange(year, month)[1]
 
-        dates = []
-        crowd_counts = []
-        crowd_levels = []
-        temperatures = []
-        visit_scores = []
+        dates, crowd_counts, crowd_levels, temperatures, visit_scores = [], [], [], [], []
 
         for day in range(1, days_in_month + 1):
             day_str = f"{year}-{month:02d}-{day:02d}"
             result = predict_for_date(place, day_str)
-
             if "error" in result:
                 continue
 
@@ -845,13 +1237,36 @@ def chart_data():
         return jsonify({"error": "Something went wrong."}), 500
 
 
+@app.route("/holidays", methods=["POST"])
+def get_holidays():
+    """Return holiday data for a given year."""
+    try:
+        data = request.get_json() or {}
+        year = data.get("year", datetime.now().year)
+        year_holidays = get_holidays_for_year(int(year))
+        return jsonify({
+            "year": year,
+            "holidays": year_holidays,
+            "count": len(year_holidays),
+            "source": "Live Calendar (holidays library + Nager.Date API)"
+        })
+    except Exception as e:
+        print(f"  ❌ Holidays error: {e}")
+        return jsonify({"error": "Something went wrong."}), 500
+
+
 # ══════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════
 
 if __name__ == "__main__":
+    current_year = datetime.now().year
+    get_holidays_for_year(current_year)
+    get_holidays_for_year(current_year + 1)
+    
     print("\n" + "╔" + "═" * 58 + "╗")
     print("║" + " Should I Visit? — Web App Running ".center(58) + "║")
     print("║" + " Open: http://localhost:5000 ".center(58) + "║")
+    print("║" + " 👤 User Accounts · 👥 Live Confirmed Visitors ".center(58) + "║")
     print("╚" + "═" * 58 + "╝\n")
     app.run(debug=True, host="0.0.0.0", port=5000)

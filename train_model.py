@@ -9,12 +9,20 @@ builds weather lookup table, and saves everything to models/
 import pandas as pd
 import numpy as np
 import os
+import sys
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report, mean_absolute_error, r2_score
+
+# Force UTF-8 output on Windows to avoid UnicodeEncodeError in print statements
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
 
 # ══════════════════════════════════════════════════════
 # CONSTANTS

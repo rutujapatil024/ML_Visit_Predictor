@@ -82,4 +82,109 @@ footer p{color:var(--muted);font-size:0.9rem}
 .hero{padding:40px 16px 24px}
 .input-card{padding:24px}
 .verdict-card{padding:28px 16px}
+.top-nav{flex-direction:column;gap:8px;padding:10px 16px}
+.auth-modal-card{width:95%;padding:24px 18px}
 }
+
+/* ───────────────────────────────────────────────── */
+/*  TOP NAVIGATION BAR                              */
+/* ───────────────────────────────────────────────── */
+.top-nav{
+    position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 32px;background:rgba(15,10,0,0.92);backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
+}
+.app-brand{font-family:'Cinzel',serif;font-size:1.15rem;color:var(--gold);font-weight:700;letter-spacing:1px}
+.app-brand span{margin-left:4px}
+.user-auth-area{display:flex;align-items:center;gap:10px}
+.auth-nav-btn{
+    padding:8px 18px;background:transparent;border:1px solid var(--gold);color:var(--gold);
+    border-radius:8px;cursor:pointer;font-family:'Lato',sans-serif;font-size:0.9rem;
+    transition:all 0.3s;letter-spacing:0.3px;
+}
+.auth-nav-btn:hover{background:var(--gold);color:#0F0A00}
+.auth-nav-btn.logout-btn{border-color:var(--red);color:var(--red);font-size:0.8rem;padding:6px 14px}
+.auth-nav-btn.logout-btn:hover{background:var(--red);color:var(--cream)}
+
+/* ───────────────────────────────────────────────── */
+/*  USER BADGE IN NAV                               */
+/* ───────────────────────────────────────────────── */
+.user-badge-nav{display:flex;align-items:center;gap:10px}
+.user-avatar-mini{
+    width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--orange));
+    color:#0F0A00;display:flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:0.95rem;font-family:'Cinzel',serif;
+}
+.user-name-nav{color:var(--cream);font-size:0.9rem;font-weight:600}
+
+/* ───────────────────────────────────────────────── */
+/*  AUTH MODAL — GLASSMORPHISM OVERLAY               */
+/* ───────────────────────────────────────────────── */
+.auth-modal-overlay{
+    position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);
+}
+.auth-modal-overlay.visible{display:flex;animation:fadeIn 0.3s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.auth-modal-card{
+    background:rgba(26,18,0,0.95);border:1px solid var(--border);border-radius:20px;
+    padding:36px 32px;width:420px;max-width:95%;position:relative;
+    box-shadow:0 24px 64px rgba(0,0,0,0.6);animation:slideUp 0.35s ease;
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.modal-close-btn{
+    position:absolute;top:14px;right:16px;background:none;border:none;
+    color:var(--muted);font-size:1.6rem;cursor:pointer;transition:color 0.2s;line-height:1;
+}
+.modal-close-btn:hover{color:var(--cream)}
+
+/* ───────────────────────────────────────────────── */
+/*  AUTH TABS                                        */
+/* ───────────────────────────────────────────────── */
+.auth-tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.auth-tab-btn{
+    flex:1;padding:12px;background:none;border:none;border-bottom:2px solid transparent;
+    color:var(--muted);font-family:'Cinzel',serif;font-size:0.95rem;cursor:pointer;
+    transition:all 0.3s;
+}
+.auth-tab-btn.active{color:var(--gold);border-bottom-color:var(--gold)}
+.auth-tab-btn:hover{color:var(--cream)}
+
+/* ───────────────────────────────────────────────── */
+/*  AUTH FORM FIELDS                                 */
+/* ───────────────────────────────────────────────── */
+.auth-field{margin-bottom:18px}
+.auth-field label{display:block;color:var(--gold);font-family:'Cinzel',serif;font-size:0.85rem;margin-bottom:6px;letter-spacing:0.4px}
+.auth-field input{
+    width:100%;padding:12px 14px;background:#0F0A00;border:1px solid var(--border);border-radius:10px;
+    color:var(--cream);font-family:'Lato',sans-serif;font-size:0.95rem;outline:none;transition:border-color 0.3s;
+}
+.auth-field input:focus{border-color:var(--gold)}
+.auth-field input::placeholder{color:var(--muted);opacity:0.6}
+.auth-submit-btn{
+    width:100%;padding:14px;margin-top:8px;background:linear-gradient(135deg,var(--gold),var(--orange));
+    color:#0F0A00;font-family:'Cinzel',serif;font-size:1rem;font-weight:700;
+    border:none;border-radius:10px;cursor:pointer;transition:all 0.3s;letter-spacing:0.5px;
+}
+.auth-submit-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(212,160,23,0.3)}
+.auth-submit-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.auth-error-msg{
+    color:var(--red);font-size:0.85rem;margin-top:14px;text-align:center;display:none;
+    padding:8px;background:rgba(244,67,54,0.08);border-radius:8px;
+}
+
+/* ───────────────────────────────────────────────── */
+/*  CONFIRMED USERS PILL LIST                        */
+/* ───────────────────────────────────────────────── */
+.confirmed-users-list{
+    margin-top:8px;font-size:0.85rem;color:var(--cream);
+    padding:6px 12px;background:rgba(76,175,80,0.08);border:1px solid rgba(76,175,80,0.2);
+    border-radius:10px;line-height:1.5;
+}
+.confirmed-users-list strong{color:var(--green)}
+
+/* ───────────────────────────────────────────────── */
+/*  PREDICTION SOURCE BAR BADGES                     */
+/* ───────────────────────────────────────────────── */
+.source-badge.live{background:rgba(76,175,80,0.12);border:1px solid rgba(76,175,80,0.3);color:var(--green)}
+.source-badge.ml-only{background:rgba(212,160,23,0.08);border:1px solid rgba(212,160,23,0.2);color:var(--gold)}
