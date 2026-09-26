@@ -1,10 +1,10 @@
-# "Should I Visit?" — Indian Landmark Crowd Predictor 🏛️✈️
+# "Should I Visit?" — Indian Landmark Crowd Predictor 
 
 **"Should I Visit?"** is a machine learning-powered web application that helps tourists decide the best time to visit famous Indian landmarks. The system predicts crowd levels, exact visitor counts, temperatures, and weather conditions for any queried landmark and date, providing an actionable recommendation (**YES**, **MAYBE**, or **NO**).
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
 - **Dynamic Live Calendar (No Hardcoded Dates)**: Automatically calculates Indian public holidays and major festivals for any year (2026, 2027, 2028, etc.) using the Python `holidays` library + Nager.Date API fallback.
 - **Real-Time Confirmed Visitor System**: Allows users to confirm their planned visits via an interactive card. The backend SQLite database (`visitors.db`) tracks confirmed visitors and dynamically blends real-time user intent with ML baseline predictions.
@@ -16,7 +16,7 @@
 
 ---
 
-## 🏗️ Project Architecture
+## Project Architecture
 
 ```
 Visit_Predictor/
@@ -34,7 +34,7 @@ Visit_Predictor/
 
 ---
 
-## 🚀 How to Run
+## How to Run
 
 1. **Install Dependencies**:
    ```bash
