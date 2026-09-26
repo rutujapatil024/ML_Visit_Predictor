@@ -239,8 +239,7 @@
                 <p class="ensemble-sub">Comparing predictions and validation performance across multiple machine learning models</p>
                 <div class="ensemble-grid">
                     <!-- Random Forest Card -->
-                    <div class="ensemble-card primary-model">
-                        <div class="ensemble-model-badge">Primary Model</div>
+                    <div class="ensemble-card">
                         <h4>Random Forest</h4>
                         <div class="ensemble-metrics-box">
                             <div class="ensemble-pred-row">
@@ -300,7 +299,8 @@
                     </div>
 
                     <!-- Gradient Boosting Card -->
-                    <div class="ensemble-card">
+                    <div class="ensemble-card primary-model">
+                        <div class="ensemble-model-badge">Primary Model</div>
                         <h4>Gradient Boosting</h4>
                         <div class="ensemble-metrics-box">
                             <div class="ensemble-pred-row">
@@ -853,7 +853,27 @@
 
             /* Render Hourly Distribution */
             if (d.hourly_distribution) {
-                document.getElementById('optimalTimeBadge').innerHTML = '🎯 Optimal Visit Time: <strong>' + d.best_time_to_visit + '</strong> (Lowest crowd density & coolest temps)';
+                let timeInfo = '🎯 Optimal Visit Time: <strong>' + d.best_time_to_visit + '</strong> (Lowest crowd density & coolest temps)';
+                if (d.operating_hours) {
+                    timeInfo += ' &nbsp;·&nbsp; 🕐 Hours: <strong>' + d.operating_hours + '</strong>';
+                }
+                document.getElementById('optimalTimeBadge').innerHTML = timeInfo;
+
+                /* Show closure warning if place is closed on this day */
+                let warningEl = document.getElementById('closureWarning');
+                if (!warningEl) {
+                    warningEl = document.createElement('div');
+                    warningEl.id = 'closureWarning';
+                    warningEl.style.cssText = 'background:#F44336;color:#fff;padding:10px 16px;border-radius:8px;margin-top:10px;font-weight:bold;text-align:center;font-size:1.05em;display:none';
+                    document.getElementById('optimalTimeBadge').parentNode.insertBefore(warningEl, document.getElementById('optimalTimeBadge').nextSibling);
+                }
+                if (d.closure_warning) {
+                    warningEl.textContent = d.closure_warning;
+                    warningEl.style.display = 'block';
+                } else {
+                    warningEl.style.display = 'none';
+                }
+
                 renderHourlyChart(d.hourly_distribution);
             }
 

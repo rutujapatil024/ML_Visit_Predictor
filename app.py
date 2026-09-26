@@ -238,6 +238,20 @@ PLACE_COORDINATES = {
     "Sanchi Stupa, Madhya Pradesh":  {"lat": 23.4793, "lon": 77.7398},
 }
 
+# ── Real Operating Hours for Each Landmark ────────────
+# Format: (open_hour_24h, close_hour_24h, closed_day or None)
+# closed_day: day name string (e.g. "Friday") or None if open daily
+PLACE_OPERATING_HOURS = {
+    "Taj Mahal, Agra":               {"open": 6,  "close": 18, "closed_day": "Friday"},
+    "Red Fort, Delhi":               {"open": 9,  "close": 16, "closed_day": "Monday"},
+    "India Gate, Delhi":             {"open": 0,  "close": 24, "closed_day": None},      # 24 hours
+    "Qutub Minar, Delhi":           {"open": 7,  "close": 17, "closed_day": None},
+    "Varanasi Ghats, Varanasi":      {"open": 0,  "close": 24, "closed_day": None},      # 24 hours
+    "Gateway of India, Mumbai":      {"open": 0,  "close": 24, "closed_day": None},      # 24 hours
+    "Mecca Masjid, Hyderabad":       {"open": 4,  "close": 21, "closed_day": None},
+    "Sanchi Stupa, Madhya Pradesh":  {"open": 8,  "close": 18, "closed_day": None},
+}
+
 # ── WMO Weather Code Mapping ─────────────────────────
 WMO_WEATHER_MAP = {
     0: "Clear", 1: "Clear", 2: "Cloudy", 3: "Cloudy",
@@ -568,9 +582,9 @@ def load_models():
 
 # Load models at startup
 loaded = load_models()
-crowd_model = loaded["classifiers"]["Random Forest"]
+crowd_model = loaded["classifiers"]["Gradient Boosting"]     # Best classifier: 68.5% accuracy
 temp_model = loaded["temp_model"]
-crowd_count_model = loaded["regressors"]["Random Forest"]
+crowd_count_model = loaded["regressors"]["Random Forest"]     # Best regressor: R²=0.895, MAE=2771
 encoders = loaded["encoders"]
 weather_lookup = loaded["weather_lookup"]
 model_metrics = loaded["metrics"]
@@ -1031,9 +1045,44 @@ def predict():
         ensemble = predict_ensemble(place, date_str)
         hourly = generate_hourly_data(place, result["crowd_count_predicted"], result["temperature"])
         
-        operating_hours = [h for h in hourly if h["crowd_count"] > 0] or hourly
-        best_hour_data = min(operating_hours, key=lambda x: (x["crowd_count"], x["temperature"]))
-        
+        # Filter hourly data to only include actual operating hours
+        op_hours = PLACE_OPERATING_HOURS.get(place, {"open": 6, "close": 21, "closed_day": None})
+        open_h, close_h = op_hours["open"], op_hours["close"]
+
+        # Parse hour strings like "7:00 AM" to 24h integers for filtering
+        def hour_str_to_24(h_str):
+            """Convert '7:00 AM' or '2:00 PM' to 24-hour int."""
+            parts = h_str.replace(":", " ").split()
+            hr = int(parts[0])
+            ampm = parts[2]
+            if ampm == "PM" and hr != 12:
+                hr += 12
+            elif ampm == "AM" and hr == 12:
+                hr = 0
+            return hr
+
+        # Filter to hours within operating window
+        if open_h == 0 and close_h == 24:
+            # 24-hour place — use all hours but prefer reasonable tourist hours
+            open_hours = [h for h in hourly if 6 <= hour_str_to_24(h["hour"]) <= 20]
+        else:
+            open_hours = [h for h in hourly if open_h <= hour_str_to_24(h["hour"]) < close_h]
+
+        if not open_hours:
+            open_hours = hourly  # fallback
+
+        best_hour_data = min(open_hours, key=lambda x: (x["crowd_count"], x["temperature"]))
+
+        # Add closure warning if the place is closed on this day
+        closed_day = op_hours.get("closed_day")
+        if closed_day:
+            try:
+                visit_day = datetime.strptime(date_str, "%Y-%m-%d").strftime("%A")
+                if visit_day == closed_day:
+                    result["closure_warning"] = f"⚠️ {place.split(',')[0]} is closed on {closed_day}s!"
+            except ValueError:
+                pass
+
         # Check confirmation status for this user or session
         result["user_confirmed"] = is_visit_confirmed(place, date_str, session_id, user_id=user_id)
 
@@ -1041,6 +1090,7 @@ def predict():
         result["model_metrics"] = model_metrics
         result["hourly_distribution"] = hourly
         result["best_time_to_visit"] = best_hour_data["hour"]
+        result["operating_hours"] = f"{op_hours['open']}:00 AM – {op_hours['close'] if op_hours['close'] <= 12 else op_hours['close']-12}:00 {'AM' if op_hours['close'] <= 12 else 'PM'}" if not (open_h == 0 and close_h == 24) else "Open 24 Hours"
 
         return jsonify(result)
 

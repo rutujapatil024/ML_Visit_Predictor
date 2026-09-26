@@ -224,7 +224,7 @@ def train_crowd_model(df):
 
     # 1. Random Forest
     rf_model = RandomForestClassifier(
-        n_estimators=100, max_depth=10, random_state=42
+        n_estimators=200, max_depth=12, class_weight='balanced', random_state=42
     )
     rf_model.fit(X_train, y_train)
     rf_pred = rf_model.predict(X_test)
@@ -240,17 +240,18 @@ def train_crowd_model(df):
     dt_acc = accuracy_score(y_test, dt_pred)
     print(f"  ✓ Decision Tree Classifier Accuracy: {dt_acc * 100:.1f}%")
 
-    # 3. Gradient Boosting
+    # 3. Gradient Boosting (tuned — primary model)
     gb_model = GradientBoostingClassifier(
-        n_estimators=50, max_depth=5, random_state=42
+        n_estimators=200, max_depth=5, learning_rate=0.1,
+        subsample=0.8, min_samples_split=5, random_state=42
     )
     gb_model.fit(X_train, y_train)
     gb_pred = gb_model.predict(X_test)
     gb_acc = accuracy_score(y_test, gb_pred)
     print(f"  ✓ Gradient Boosting Classifier Accuracy: {gb_acc * 100:.1f}%")
 
-    # Feature importances for RF (primary model)
-    importances = dict(zip(FEATURE_COLS, rf_model.feature_importances_))
+    # Feature importances for GB (primary model)
+    importances = dict(zip(FEATURE_COLS, gb_model.feature_importances_))
     print("\n  RF Feature Importances:")
     for feat, imp in sorted(importances.items(), key=lambda x: -x[1]):
         bar = "█" * int(imp * 50)
@@ -279,8 +280,9 @@ def train_temp_model(df):
     )
     print(f"  Train set: {len(X_train)} rows | Test set: {len(X_test)} rows")
 
-    model = RandomForestRegressor(
-        n_estimators=100, random_state=42
+    model = GradientBoostingRegressor(
+        n_estimators=200, max_depth=5, learning_rate=0.1,
+        subsample=0.8, min_samples_split=5, random_state=42
     )
     model.fit(X_train, y_train)
 
@@ -307,7 +309,7 @@ def train_crowd_count_model(df):
 
     # 1. Random Forest
     rf_model = RandomForestRegressor(
-        n_estimators=150, max_depth=12, random_state=42
+        n_estimators=200, max_depth=14, random_state=42
     )
     rf_model.fit(X_train, y_train)
     rf_pred = rf_model.predict(X_test)
@@ -325,9 +327,10 @@ def train_crowd_count_model(df):
     dt_r2 = r2_score(y_test, dt_pred)
     print(f"  ✓ Decision Tree Regressor - MAE: {dt_mae:.0f} visitors | R2: {dt_r2:.3f}")
 
-    # 3. Gradient Boosting
+    # 3. Gradient Boosting (tuned — primary model)
     gb_model = GradientBoostingRegressor(
-        n_estimators=50, max_depth=5, random_state=42
+        n_estimators=200, max_depth=5, learning_rate=0.1,
+        subsample=0.8, min_samples_split=5, random_state=42
     )
     gb_model.fit(X_train, y_train)
     gb_pred = gb_model.predict(X_test)

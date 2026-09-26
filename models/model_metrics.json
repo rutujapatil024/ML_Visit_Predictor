@@ -1,7 +1,7 @@
 {
   "classification": {
     "Random Forest": {
-      "accuracy": 0.6644
+      "accuracy": 0.6438
     },
     "Decision Tree": {
       "accuracy": 0.6849
@@ -12,16 +12,16 @@
   },
   "regression": {
     "Random Forest": {
-      "mae": 2749.9,
-      "r2": 0.8961
+      "mae": 2770.63,
+      "r2": 0.8954
     },
     "Decision Tree": {
       "mae": 3655.99,
       "r2": 0.8046
     },
     "Gradient Boosting": {
-      "mae": 2917.56,
-      "r2": 0.8908
+      "mae": 3236.09,
+      "r2": 0.8627
     }
   }
 }

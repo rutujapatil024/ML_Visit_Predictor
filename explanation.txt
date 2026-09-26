@@ -100,20 +100,20 @@ temperature prediction, and a statistical weather lookup table fallback.
 
 A. Crowd Level Classifiers (Low, Moderate, High, Extreme)
 Three classifier models are trained and compared side-by-side:
-  1. Random Forest Classifier:
-     * Algorithm: RandomForestClassifier (n_estimators=100, max_depth=10, random_state=42)
-     * Performance: ~66.4% test split accuracy.
-     * Role: Primary model. Excellent generalization and handles features without scaling.
-  2. Decision Tree Classifier:
+  1. Gradient Boosting Classifier (PRIMARY CLASSIFIER):
+     * Algorithm: GradientBoostingClassifier (n_estimators=200, max_depth=5, learning_rate=0.1, subsample=0.8, random_state=42)
+     * Performance: ~68.5% test split accuracy (highest performing classifier).
+     * Role: Primary classifier model. Uses sequential gradient boosting to correct residual errors and maximize boundary precision.
+  2. Random Forest Classifier:
+     * Algorithm: RandomForestClassifier (n_estimators=200, max_depth=12, class_weight='balanced', random_state=42)
+     * Performance: ~64.4% test split accuracy.
+     * Role: Ensemble comparison model. Provides bagging robustness and handles nonlinear feature splits.
+  3. Decision Tree Classifier:
      * Algorithm: DecisionTreeClassifier (max_depth=10, random_state=42)
      * Performance: ~68.5% test split accuracy.
-     * Role: Alternative model, offering high interpretability and local split accuracy.
-  3. Gradient Boosting Classifier:
-     * Algorithm: GradientBoostingClassifier (n_estimators=50, max_depth=5, random_state=42)
-     * Performance: ~68.5% test split accuracy.
-     * Role: Alternative model, utilizing boosting to correct sequential errors.
+     * Role: Ensemble comparison model, offering transparent rule-based classification.
 
-Feature Importances (as calculated by Gini Importance from the primary RF Classifier):
+Feature Importances (as calculated by Gini / Tree Importance from the primary models):
   1. place_enc (~31.2%): The landmark itself is the strongest crowd predictor.
   2. event_enc (~17.8%): Special events/festivals strongly dictate crowd size.
   3. day_of_month (~17.7%): Monthly cycle fluctuations.
@@ -125,18 +125,18 @@ Feature Importances (as calculated by Gini Importance from the primary RF Classi
 
 B. Crowd Count Regressors (Granular predicted visitor numbers)
 Three regressor models are trained and compared side-by-side:
-  1. Random Forest Regressor:
+  1. Random Forest Regressor (PRIMARY REGRESSOR):
      * Algorithm: RandomForestRegressor (n_estimators=150, max_depth=12, random_state=42)
-     * Performance: MAE of ~2,750 visitors, R² Score ~0.76.
-     * Role: Primary regressor. High accuracy for mapping complex seasonal shapes.
-  2. Decision Tree Regressor:
+     * Performance: MAE of ~2,771 visitors, R² Score ~0.895 (highest regression accuracy).
+     * Role: Primary regressor. Excels at smoothing outliers and mapping complex nonlinear visitor curves.
+  2. Gradient Boosting Regressor:
+     * Algorithm: GradientBoostingRegressor (n_estimators=200, max_depth=5, learning_rate=0.1, subsample=0.8, random_state=42)
+     * Performance: MAE of ~3,236 visitors, R² Score ~0.863.
+     * Role: Ensemble comparison regressor.
+  3. Decision Tree Regressor:
      * Algorithm: DecisionTreeRegressor (max_depth=12, random_state=42)
-     * Performance: MAE of ~3,656 visitors, R² Score ~0.61.
-     * Role: Alternative regressor.
-  3. Gradient Boosting Regressor:
-     * Algorithm: GradientBoostingRegressor (n_estimators=50, max_depth=5, random_state=42)
-     * Performance: MAE of ~2,918 visitors, R² Score ~0.74.
-     * Role: Alternative regressor.
+     * Performance: MAE of ~3,656 visitors, R² Score ~0.805.
+     * Role: Ensemble comparison regressor.
 
 C. Temperature Predictor (RandomForestRegressor)
   * Target: Average daily temperature in °C (Continuous variable)
@@ -160,10 +160,11 @@ When a user queries a landmark and date, the backend performs the following step
 2. Holiday/Festival Enrichment: Fetches holidays DYNAMICALLY from the Python 'holidays'
    library + Nager.Date API (with resilient try-except fallback). Data is cached per-year in memory.
    This replaces the old hardcoded INDIAN_HOLIDAYS dictionary and works for ANY future year automatically.
-3. ML Execution: Calls the saved Random Forest models to predict:
-   - Crowd Level (classification)
-   - Crowd Count (regression — actual predicted visitor numbers)
-   - Temperature (regression)
+3. ML Execution: Calls the saved trained models:
+   - Primary Classifier (Gradient Boosting): Predicts crowd level (Low, Moderate, High, Extreme).
+   - Primary Regressor (Random Forest): Predicts exact crowd count numbers.
+   - Temperature Regressor (Random Forest): Predicts daily mean temperature in °C.
+   - Alternative Ensemble Models (DT, RF classifiers / DT, GB regressors): Evaluated in parallel for multi-model cross-validation.
    Feature input arrays are passed as pandas DataFrames with explicit column names to eliminate scikit-learn warnings.
 4. Confirmed Visitor Blending (Real-Time User Integration):
    - Queries the SQLite database (`visitors.db`) for confirmed visitors for this place + date.
@@ -174,7 +175,7 @@ When a user queries a landmark and date, the backend performs the following step
    - CONFIRMED_VISITOR_SCALE = 50 (each confirmed user represents ~50 actual visitors)
    - The blended count is always at least the estimated real visitors.
 5. Weather Resolution:
-   - For dates within 16 days: Fetches LIVE weather from Open-Meteo API (see Section 9).
+   - For dates within 16 days: Fetches LIVE weather from Open-Meteo API (see Section 8).
    - For dates beyond 16 days: Falls back to ML weather lookup table.
    - Response includes a "weather_source" field indicating "Live Forecast" or "ML Prediction".
 6. Visit Score Calculation (0 - 100):
@@ -207,6 +208,19 @@ When a user queries a landmark and date, the backend performs the following step
    * Rain (Rainy): Bring umbrellas, caution on slippery stone steps.
    * Crowds (High/Extreme): Book tickets online to avoid queue, arrive before 8:00 AM.
    * Low Crowds: Enjoy a peaceful, relaxed visit.
+10. Landmark Operating Hours & Closure Verification:
+   * Cross-checks real operating hours (PLACE_OPERATING_HOURS) for each destination:
+     - Taj Mahal: 6:00 AM – 6:00 PM (Closed Fridays)
+     - Red Fort: 9:00 AM – 4:00 PM (Closed Mondays)
+     - India Gate: 24 Hours
+     - Qutub Minar: 7:00 AM – 5:00 PM
+     - Varanasi Ghats: 24 Hours
+     - Gateway of India: 24 Hours
+     - Mecca Masjid: 4:00 AM – 9:00 PM
+     - Sanchi Stupa: 8:00 AM – 6:00 PM
+   * Filtered Optimal Time: Ensures the suggested "Optimal Visit Time" strictly falls 
+     within open hours (e.g. will not recommend 7:00 AM for Red Fort, which opens at 9:00 AM).
+   * Closed Day Alerts: Alerts the user immediately if the monument is closed on that day.
 
 --------------------------------------------------------------------------------
 7. FLASK WEB APPLICATION & USER AUTHENTICATION
@@ -295,15 +309,20 @@ A. Monthly Trends Chart
     - Selected date is highlighted with a gold border on its bar
   * Interactivity: Hover tooltips showing date, crowd level, visitor count, temperature, and score.
 
-B. Hourly Distribution Curves
+B. Hourly Distribution Curves & Verified Optimal Visit Time
   * Data: Generated dynamically in the `/predict` endpoint using landmark-specific
-    operating hours and peak/off-peak density weights.
-  * Hourly Intervals: 6:00 AM, 8:00 AM, 10:00 AM, 12:00 PM, 2:00 PM, 4:00 PM, 6:00 PM, 8:00 PM.
-  * Chart Type: Line chart with filled area underneath
-    - Area Line: Expected crowd density (visitor distribution count)
-    - Line: Expected hourly temperature variation (coolest mornings, peak mid-afternoon heat)
-  * Optimal Visit Time: Calculates the single hour matching the lowest relative crowd count 
-    and coolest temperature window (e.g. 6:00 AM or 8:00 AM for outdoor monuments).
+    operating profiles and peak/off-peak density weights across 16 hourly slots (6:00 AM to 9:00 PM).
+  * Chart Type: Line chart with filled gradient area underneath
+    - Area Line: Expected crowd density (visitor distribution count per hour)
+    - Line: Expected hourly temperature variation (coolest morning hours, peak afternoon heat)
+  * Real Operating Hours Filter:
+    - Automatically checks the monument's real opening/closing window from `PLACE_OPERATING_HOURS`.
+    - Restricts the candidate optimal visit hours to ONLY those times when the landmark is open 
+      (e.g., Red Fort opens at 9:00 AM, so 6:00–8:00 AM will never be recommended).
+    - If the user selects a day when the monument is closed (e.g., Taj Mahal on Fridays, Red Fort on Mondays),
+      a prominent warning banner notifies the tourist that the site is closed to visitors.
+  * Optimal Visit Time Metric: Calculates the single hour with the lowest crowd density 
+    and pleasant temperatures strictly within open operating hours.
 
 --------------------------------------------------------------------------------
 10. DYNAMIC LIVE CALENDAR INTEGRATION
